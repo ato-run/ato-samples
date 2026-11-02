@@ -1,0 +1,28 @@
+name: sample inputs
+on:
+  pull_request:
+  push:
+    branches: [stg, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate historical sample metadata
+        working-directory: samples
+        run: |
+          npm ci --ignore-scripts
+          npm run validate
+      - name: Verify Browser Capsule fixture build
+        working-directory: fixtures/generic-dom
+        run: |
+          node --check server.mjs
+          node --check build-site.mjs
+          node build-site.mjs
+          cmp browser-runner-bridge-v0.1.2.js dist/__ato/browser-runner-bridge-v0.1.2.js

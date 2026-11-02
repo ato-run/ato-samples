@@ -1,0 +1,5 @@
+.capsule/
+.tmp/
+*.capsule
+.wrangler/
+dist/

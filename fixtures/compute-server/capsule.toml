@@ -1,0 +1,18 @@
+schema_version = "1"
+name = "e2e-compute-server"
+version = "1.0.0"
+
+[metadata]
+short_description = "Dynamic compute fixture for the ato publication-lane E2E"
+description = "Per-process nonce server. Deliberately NOT static-eligible. Used only by the S02 E2E suite."
+
+[run]
+command = ["python3", "server.py"]
+
+[web]
+port = 8080
+bind = "0.0.0.0"
+
+[seal_at]
+command = ["python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=10).read()"]
+timeout_seconds = 30

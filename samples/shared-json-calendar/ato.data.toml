@@ -1,0 +1,10 @@
+# Read only, and that is the whole declaration: the runtime refuses a write
+# through this port even if the App tried one.
+schema = "ato.data-ports/1"
+
+[[port]]
+name = "todo"
+protocol = "ato.data.json@1"
+scope = "user"
+access = "read"
+required = true
