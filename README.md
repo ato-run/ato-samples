@@ -18,4 +18,4 @@ The two fixture directories are copied from public repositories at the revisions
 | `ato-run/ato-e2e-compute-server` | `4f442f1ad27ae6a27eb3341283a4bb666cbdda2e` | `fixtures/compute-server/` |
 | `ato-run/ato-activity-generic-dom-fixture` | `c252e15533523731d30b6cecaf91077d70046761` | `fixtures/generic-dom/` |
 
-The original sample repository provides `samples/LICENSE`. The sample tools lockfile has been updated to address npm audit findings; the other imported inputs are retained as supplied, except for a status note in `samples/README.md`. The other imported repositories did not include a license at the pinned revisions; this migration does not assign new reuse terms to those files.
+The original sample repository provides `samples/LICENSE`. The sample tools lockfile has been updated to address npm audit findings; the other imported inputs are retained as supplied, except for the revised historical index in `samples/README.md`. The other imported repositories did not include a license at the pinned revisions; this migration does not assign new reuse terms to those files.
