@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Expense Tracker</title>
+    <style>
+      :root { color-scheme: light; }
+      body {
+        margin: 0;
+        padding: 32px 20px 64px;
+        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #0f172a;
+        background: #ffffff;
+      }
+      main { max-width: 480px; margin: 0 auto; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      p.sub { margin: 0 0 24px; color: #475569; font-size: 13px; }
+      form { display: flex; gap: 8px; margin-bottom: 20px; }
+      input {
+        flex: 1; min-width: 0; padding: 9px 11px;
+        border: 1px solid #e2e8f0; border-radius: 8px; font: inherit;
+      }
+      input[type="number"] { flex: 0 0 96px; }
+      button {
+        padding: 9px 14px; border: 0; border-radius: 8px;
+        background: #da0d5e; color: #fff; font: inherit; font-weight: 600;
+        cursor: pointer;
+      }
+      ul { list-style: none; margin: 0; padding: 0; }
+      li {
+        display: flex; align-items: center; gap: 12px;
+        padding: 11px 0; border-bottom: 1px solid #f1f5f9;
+      }
+      li span:first-child { flex: 1; }
+      li button {
+        background: transparent; color: #64748b; font-weight: 500; padding: 4px 6px;
+      }
+      .total { margin-top: 20px; font-weight: 650; }
+      .empty { color: #64748b; padding: 24px 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Expense Tracker</h1>
+      <p class="sub">
+        Everything here is kept in <code>localStorage</code> under the key
+        <code>expenses</code>.
+      </p>
+      <form id="add">
+        <input id="label" placeholder="What was it?" required maxlength="60" />
+        <input id="amount" type="number" placeholder="0" required min="0" step="1" />
+        <button type="submit">Add</button>
+      </form>
+      <ul id="list"></ul>
+      <p class="total" id="total"></p>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

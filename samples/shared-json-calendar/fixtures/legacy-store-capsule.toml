@@ -1,0 +1,12 @@
+schema_version = "0.3"
+name = "shared-json-calendar"
+version = "0.1.0"
+type = "app"
+runtime = "web/static"
+run = "index.html"
+port = 8080
+
+[metadata]
+display_name = "Calendar"
+description = "Reads the Todo board you already have and shows it by due date. Read-only; it keeps no copy"
+tags = ["static", "data-resource", "cross-app-data"]

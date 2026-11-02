@@ -1,0 +1,11 @@
+# What this App needs, not which data it gets. "todo" is this App's own name
+# for the connection, not a shared data type: the protocol below says only
+# "this is JSON". The concrete Resource is chosen by the person at runtime.
+schema = "ato.data-ports/1"
+
+[[port]]
+name = "todo"
+protocol = "ato.data.json@1"
+scope = "user"
+access = "read_write"
+required = true
