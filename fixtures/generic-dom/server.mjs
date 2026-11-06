@@ -15,13 +15,14 @@ export const page = `<!doctype html>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Generic DOM collaboration fixture</title>
+    <title>Ato Public Launch Lab</title>
     <style>
       :root { font-family: system-ui, sans-serif; color-scheme: light; }
       body { margin: 0; background: #f5f2e9; color: #17211b; }
-      main { max-width: 760px; margin: 0 auto; padding: 32px; }
-      h1 { margin: 0 0 8px; font-size: 28px; }
-      .card { margin-top: 20px; padding: 20px; border: 2px solid #17211b; border-radius: 16px; background: #fffdf6; box-shadow: 6px 6px 0 #17211b; }
+      main { max-width: 1180px; margin: 0 auto; padding: 16px 24px 32px; }
+      h1 { margin: 0 0 4px; font-size: 26px; }
+      main > p { margin: 4px 0 10px; }
+      .card { margin-top: 12px; padding: 14px; border: 2px solid #17211b; border-radius: 16px; background: #fffdf6; box-shadow: 4px 4px 0 #17211b; }
       button, input { font: inherit; }
       button { padding: 10px 16px; border: 2px solid #17211b; border-radius: 999px; background: #f2c94c; cursor: pointer; }
       input { width: min(100%, 360px); padding: 10px 12px; border: 2px solid #17211b; border-radius: 10px; }
@@ -30,13 +31,66 @@ export const page = `<!doctype html>
       .scroll-content { height: 420px; background: linear-gradient(#d7f5de, #9cc7ff); }
       .drag-stage { position: relative; height: 130px; border: 2px dashed #17211b; border-radius: 10px; touch-action: none; }
       .drag-box { position: absolute; left: 16px; top: 28px; width: 72px; height: 72px; display: grid; place-items: center; border: 2px solid #17211b; border-radius: 12px; background: #e8a8ff; user-select: none; }
-      output { display: block; margin-top: 10px; font-family: ui-monospace, monospace; }
+      output { display: block; margin-top: 6px; font-family: ui-monospace, monospace; }
+      .archetypes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+      .archetype { position: relative; overflow: hidden; }
+      .archetype h2 { margin: 8px 0; font-size: 22px; }
+      .archetype p { min-height: 42px; margin: 6px 0; }
+      .eyebrow { font: 700 11px ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: #516b5b; }
+      .game-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; max-width: 170px; margin: 8px 0; padding: 7px; border-radius: 12px; background: #bbada0; }
+      .tile { display: grid; aspect-ratio: 1; place-items: center; border-radius: 8px; background: #cdc1b4; font-size: clamp(16px, 4vw, 28px); font-weight: 850; }
+      .tile.hot { color: #f9f6f2; background: #edc53f; }
+      .tile.won { color: #f9f6f2; background: #edc22e; box-shadow: 0 0 0 4px rgba(237,194,46,.25); }
+      .pixel-grid { display: grid; grid-template-columns: repeat(8, 20px); width: fit-content; margin: 8px 0; border: 4px solid #17211b; background: #fff; }
+      .pixel { width: 20px; height: 20px; padding: 0; border: 1px solid rgba(23,33,27,.12); border-radius: 0; background: #f4efe5; }
+      .pixel.done { background: #ff7455; }
+      .pixel.seed { background: #17211b; }
+      .test-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 10px 0; padding: 10px; border: 2px solid #17211b; border-radius: 10px; font-family: ui-monospace, monospace; }
+      .test-state { color: #b42318; font-weight: 850; }
+      .test-line.fixed .test-state { color: #18794e; }
+      @media (max-width: 520px) {
+        .archetypes { grid-template-columns: 1fr; }
+        .archetype p { min-height: 0; }
+      }
     </style>
   </head>
   <body>
     <main>
-      <h1>Generic DOM collaboration fixture</h1>
-      <p>No Activity-specific or application-specific bridge is installed.</p>
+      <h1>Ato Public Launch Lab</h1>
+      <p>Three ordinary Browser computations. No product-specific bridge is installed.</p>
+      <div class="archetypes">
+        <section class="card archetype" id="play">
+          <span class="eyebrow">Play · one move</span>
+          <h2>2048 is one move away</h2>
+          <p>Press ArrowRight or use the button to merge the final pair.</p>
+          <div class="game-board" aria-label="2048 board">
+            <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+            <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+            <span class="tile"></span><span class="tile"></span><span class="tile"></span><span class="tile"></span>
+            <span class="tile"></span><span class="tile"></span><span class="tile hot" id="tile-left">1024</span><span class="tile hot" id="tile-right">1024</span>
+          </div>
+          <button id="win-move" type="button">Make the winning move →</button>
+          <output id="play-result">One move remaining</output>
+        </section>
+        <section class="card archetype" id="create">
+          <span class="eyebrow">Create · eight pixels</span>
+          <h2>Finish the signal</h2>
+          <p>Fill the eight pale pixels. Every click changes the actual canvas state.</p>
+          <div class="pixel-grid" id="pixel-grid" aria-label="Pixel art canvas"></div>
+          <output id="pixel-result">8 pixels remaining</output>
+        </section>
+        <section class="card archetype" id="developer">
+          <span class="eyebrow">Developer · one failing test</span>
+          <h2>Repair the button contract</h2>
+          <p>The fixture has exactly one obvious assertion failure and a one-line repair.</p>
+          <div class="test-line" id="test-line">
+            <code>button.label === "Save"</code>
+            <span class="test-state" id="test-state">FAIL · got "Svae"</span>
+          </div>
+          <button id="apply-fix" type="button">Apply one-line fix</button>
+          <output id="developer-result">1 failing · 7 passing</output>
+        </section>
+      </div>
       <section class="card">
         <button id="increment" type="button">Increment</button>
         <span data-counter>0</span>
@@ -84,6 +138,45 @@ export const page = `<!doctype html>
           lastEvent.textContent = 'semantic:-1';
         }
       }, { capture: true });
+
+      const win = () => {
+        const left = document.querySelector('#tile-left');
+        const right = document.querySelector('#tile-right');
+        if (right.hidden) return;
+        left.textContent = '2048';
+        left.classList.add('won');
+        right.hidden = true;
+        document.querySelector('#play-result').textContent = 'You made 2048 · state changed';
+      };
+      document.querySelector('#win-move').addEventListener('click', win);
+      window.addEventListener('keydown', (event) => {
+        if (event.code === 'ArrowRight') win();
+      });
+
+      const pixelGrid = document.querySelector('#pixel-grid');
+      const unfinished = new Set([9, 10, 17, 22, 25, 30, 42, 45]);
+      for (let index = 0; index < 64; index += 1) {
+        const pixel = document.createElement('button');
+        pixel.type = 'button';
+        pixel.className = 'pixel ' + (unfinished.has(index) ? '' : (index % 9 === 0 || index % 7 === 0 ? 'seed' : 'done'));
+        pixel.setAttribute('aria-label', 'Pixel ' + (index + 1));
+        if (unfinished.has(index)) {
+          pixel.addEventListener('click', () => {
+            if (!unfinished.delete(index)) return;
+            pixel.classList.add('done');
+            const remaining = unfinished.size;
+            document.querySelector('#pixel-result').textContent = remaining === 0 ? 'Artwork complete · state changed' : remaining + ' pixels remaining';
+          });
+        }
+        pixelGrid.append(pixel);
+      }
+
+      document.querySelector('#apply-fix').addEventListener('click', () => {
+        document.querySelector('#test-line').classList.add('fixed');
+        document.querySelector('#test-state').textContent = 'PASS · got "Save"';
+        document.querySelector('#developer-result').textContent = '8 passing · state changed';
+        document.querySelector('#apply-fix').textContent = 'Fix applied';
+      });
 
       const stage = document.querySelector('#drag-stage');
       const box = document.querySelector('#drag-box');
