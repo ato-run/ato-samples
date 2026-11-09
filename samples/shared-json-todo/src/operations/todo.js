@@ -437,6 +437,20 @@ export function boardDocument({ state }) {
   return { operations: [], result: readBoardState(state) };
 }
 
+// Calendar's only view of the board: the declared projection, nothing else.
+export function listDueDates({ state }) {
+  const board = readBoardState(state);
+  const tasks = sortedTasks(board)
+    .filter((task) => task && task.dueAt && !task.archived)
+    .map((task) => ({
+      task_id: String(task.id),
+      title: String(task.title || ""),
+      due_at: String(task.dueAt),
+      completed: task.completed === true,
+    }));
+  return { operations: [], result: { tasks } };
+}
+
 export function listTodos({ state }) {
   const board = readBoardState(state);
   const numbered = ensureTaskNumbers(board);

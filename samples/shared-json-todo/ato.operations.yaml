@@ -469,4 +469,40 @@ operations:
       access: read
     effects: {external: none}
     expose: {mcp: false, webmcp: false}
+  - id: todo_list_due_dates
+    title: todo.listDueDates
+    description: "Calendar向けの期日投影（task_id, title, due_at, completedのみ）"
+    semantics: observation
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    output:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              task_id: {type: string}
+              title: {type: string}
+              due_at: {type: string}
+              completed: {type: boolean}
+            required: [task_id, title, due_at, completed]
+            additionalProperties: false
+      required: [tasks]
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: listDueDates
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@1
+      access: read
+    effects: {external: none}
+    expose: {mcp: true, webmcp: false}
 state_write_policy: operations_only
