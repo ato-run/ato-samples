@@ -1,10 +1,9 @@
-# Read only, and that is the whole declaration: the runtime refuses a write
-# through this port even if the App tried one.
-schema = "ato.data-ports/1"
+schema = "ato.data-ports/2"
 
 [[port]]
-name = "todo"
-protocol = "ato.data.json@1"
-scope = "user"
-access = "read"
+name = "tasks"
+protocol = "todo.board@1"
+scope = "instance"
+access = "operations"
+operations = ["todo_list_due_dates"]
 required = true
