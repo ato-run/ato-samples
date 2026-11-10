@@ -1,0 +1,14 @@
+schema_version = "0.3"
+name = "excalidraw"
+version = "0.1.0"
+type = "app"
+runtime = "web/static"
+run = "dist"
+port = 8080
+
+[metadata]
+display_name = "Excalidraw"
+description = "Excalidraw whiteboard whose scene is a declared DataResource operation surface"
+tags = ["sample", "static", "data-resource", "excalidraw"]
+
+build = "npm install && npm run build"
