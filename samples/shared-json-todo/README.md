@@ -5,7 +5,7 @@ account owns — so a second app can consume exactly the projection it was
 granted. This is the writing half of the pair; `shared-json-calendar` is the
 operation-only reading half.
 
-The root `capsule.toml` is the `ato.capsule/1` route consumed by Formation.
+The root `capsule.toml` is `ato.capsule/2` authoring: one Static Web derivation whose Contract requires `GET /` → 200. `ato pack` compiles it into a portable Application bundle.
 `fixtures/legacy-store-capsule.toml` preserves the former Store submission
 grammar as a negative Formation fixture; it must fail with
 `legacy_store_manifest` rather than falling back to a Preset.

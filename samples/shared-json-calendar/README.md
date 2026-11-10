@@ -4,7 +4,7 @@ A calendar built from a **projection**, not from someone else's document. It
 owns nothing: it invokes one declared observation against the Port the owner
 connected, and arranges the due dates that come back.
 
-The root `capsule.toml` is the `ato.capsule/1` route consumed by Formation.
+The root `capsule.toml` is `ato.capsule/2` authoring: one Static Web derivation whose Contract requires `GET /` → 200. `ato pack` compiles it into a portable Application bundle.
 `fixtures/legacy-store-capsule.toml` preserves the former Store submission
 grammar as a negative Formation fixture; it must fail with
 `legacy_store_manifest` rather than falling back to a Preset.
