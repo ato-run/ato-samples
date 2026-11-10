@@ -88,14 +88,14 @@ function openTaskModal(taskId = null, columnId = "todo") {
   dom.description.value = task?.description || "";
   dom.column.value = task?.columnId || columnId;
   dom.priority.value = task?.priority || "none";
-  dom.due.value = task?.dueAt || "";
+  dom.due.value = (task?.dueAt || "").slice(0, 10);
   dom.completed.checked = !!task?.completed;
   draftSubtasks = task ? task.subtasks.map((s) => ({ ...s })) : [];
   dom.deleteTask.style.visibility = task ? "visible" : "hidden";
   dom.newSubtask.value = "";
   renderSubtasks();
   dom.modalBackdrop.classList.add("open");
-  setTimeout(() => dom.title.focus(), 0);
+  dom.title.focus();
 }
 
 function closeModal() {
@@ -249,6 +249,56 @@ async function saveModalTask() {
       document.getElementById("recurrenceWeekdaySelect").value,
     );
   }
+  if (editingTaskId) {
+    const current = state.tasks[editingTaskId];
+    if (!current) {
+      toast("タスクが削除されています");
+      return;
+    }
+    const fields = {
+      title: "title",
+      description: "description",
+      priority: "priority",
+      column_id: "columnId",
+      completed: "completed",
+    };
+    for (const [argument, field] of Object.entries(fields))
+      if (args[argument] === current[field]) delete args[argument];
+    if (args.due_at === (current.dueAt || "").slice(0, 10)) delete args.due_at;
+    const known = (list) =>
+      list.map((sub, i) => ({
+        id: sub.id,
+        title: sub.title,
+        completed: sub.completed,
+        order: (i + 1) * ORDER_STEP,
+      }));
+    if (
+      JSON.stringify(known(args.subtasks)) ===
+      JSON.stringify(known(current.subtasks))
+    )
+      delete args.subtasks;
+    else if (
+      document.body.dataset.projectOperations !== "true" &&
+      current.subtasks.some((sub) =>
+        Object.keys(sub).some(
+          (key) => !["id", "title", "completed", "order"].includes(key),
+        ),
+      )
+    ) {
+      toast(
+        "追加フィールドを持つサブタスクの編集には新しいデータ契約が必要です",
+      );
+      return;
+    }
+  }
+  if (args.subtasks)
+    args.subtasks = args.subtasks.map((sub) => ({
+      id: sub.id,
+      title: sub.title,
+      completed: sub.completed,
+      order: sub.order,
+    }));
+  window.TaskBoardUI?.taskArguments(args);
   await runOperation(
     editingTaskId ? "todo_update" : "todo_create",
     args,

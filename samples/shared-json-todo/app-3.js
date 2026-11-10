@@ -1,6 +1,9 @@
 function beginTouchDrag(event, kind, id) {
   if (event.pointerType === "mouse") return;
-  const handle = event.currentTarget;
+  const handle = event.target.closest(
+    kind === "task" ? "[data-task-handle]" : "[data-sub-handle]",
+  );
+  if (!handle || handle.disabled) return;
   const source =
     kind === "task"
       ? handle.closest(".task-card")

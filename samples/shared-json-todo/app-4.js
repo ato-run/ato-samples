@@ -81,20 +81,7 @@ window.addEventListener("keydown", (event) => {
   control.addEventListener("change", render);
 });
 
-window.addEventListener("storage", (event) => {
-  if (event.key !== STORAGE_KEY || !event.newValue) return;
-  try {
-    acceptRemoteState(JSON.parse(event.newValue), "storage");
-  } catch (_) {}
-});
-
-window.addEventListener("ato:state-update", (event) => {
-  const detail = event.detail || {};
-  if (detail.key && detail.key !== STORAGE_KEY) return;
-  if (!detail.state) return;
-  acceptRemoteState(detail.state, "ato.run");
-});
-
+// Forged storage/BroadcastChannel/custom-event payloads cannot replace Resource observations.
 window.AtoTaskBoard = Object.freeze({
   storageKey: STORAGE_KEY,
   getState: () => structuredCloneSafe(state),

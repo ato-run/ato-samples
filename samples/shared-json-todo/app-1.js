@@ -50,13 +50,7 @@ let dragContext = null;
 let touchDrag = null;
 let pendingRemoteState = null;
 
-try {
-  broadcast = new BroadcastChannel(CHANNEL_NAME);
-  broadcast.onmessage = (event) => {
-    if (!event.data || event.data.clientId === CLIENT_ID) return;
-    acceptRemoteState(event.data.state, "BroadcastChannel");
-  };
-} catch (_) {}
+// Resource snapshots only arrive through the authenticated observation bridge.
 
 function nowISO() {
   return new Date().toISOString();
@@ -97,6 +91,7 @@ function normalizeState(input) {
   const columns =
     Array.isArray(s.columns) && s.columns.length
       ? s.columns.map((c, i) => ({
+          ...c,
           id: String(c.id || `column-${i}`),
           title: String(c.title || `Column ${i + 1}`),
           order: Number.isFinite(c.order) ? c.order : (i + 1) * ORDER_STEP,
@@ -119,6 +114,7 @@ function normalizeState(input) {
       : columns[0].id;
     const subtasks = Array.isArray(raw.subtasks)
       ? raw.subtasks.map((sub, i) => ({
+          ...sub,
           id: String(sub.id || uid("sub")),
           title: String(sub.title || ""),
           completed: !!sub.completed,
@@ -127,6 +123,7 @@ function normalizeState(input) {
       : [];
 
     tasks[id] = {
+      ...raw,
       id,
       number: normalizeTaskNumber(raw.number),
       columnId,
@@ -160,6 +157,7 @@ function normalizeState(input) {
   const configuredNextTaskNumber = normalizeTaskNumber(s.nextTaskNumber) || 1;
 
   return {
+    ...s,
     schemaVersion: Math.max(
       Number.isFinite(s.schemaVersion) ? s.schemaVersion : 1,
       3,
@@ -180,16 +178,11 @@ function normalizeState(input) {
 }
 
 // The board's authoritative copy is the DataResource document. The operation
-// client refreshes this snapshot from the todo_board observation; localStorage
-// is only the legacy fallback while an instance is not connected yet.
+// client refreshes this snapshot from todo_board; browser storage is never an authority.
 function rawBoardDocument() {
-  if (window.__atoBoardDocument) return window.__atoBoardDocument;
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-  } catch (_) {
-    return null;
-  }
+  return window.__atoBoardDocument || null;
 }
+
 function loadState() {
   // A failed authoritative read must not be disguised as the legacy local
   // board: show an empty view and let the sync label explain the failure.
@@ -238,10 +231,6 @@ function applyPendingRemoteIfAny() {
 
 function showSync(text) {
   dom.syncLabel.textContent = text;
-  clearTimeout(showSync._timer);
-  showSync._timer = setTimeout(() => {
-    dom.syncLabel.textContent = "同期準備完了";
-  }, 1600);
 }
 
 function toast(message) {
@@ -352,6 +341,7 @@ function render() {
     dom.board.appendChild(columnEl);
   }
   installNativeDnD();
+  window.TaskBoardUI?.render();
 }
 
 function renderTaskCard(task) {
