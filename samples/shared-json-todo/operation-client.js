@@ -1,11 +1,42 @@
 "use strict";
 // Resource authority only: observations render; prepared Operations commit.
+const DEFAULT_BOARD_PORT = "tasks";
 let pendingOperation = null;
 let operationBusy = false;
 let boardReadSequence = 0;
 let syncQueued = false;
 let boardReading = 0;
 window.__atoBoardError = "board_loading";
+/**
+ * Which Port this board currently drives. "tasks" is the person's own board;
+ * "team_tasks" is the team board the same Instance may also hold. The
+ * selection is a view/write-target choice, not a second source of truth.
+ */
+function boardPort() {
+  try {
+    return (
+      window.__atoBoardPort ||
+      window.localStorage.getItem("ato.board.port") ||
+      DEFAULT_BOARD_PORT
+    );
+  } catch {
+    return window.__atoBoardPort || DEFAULT_BOARD_PORT;
+  }
+}
+/** Address the selected Port explicitly; fall back to the served instance Port. */
+function prepareOnPort(operation, args, key) {
+  const port = boardPort();
+  if (window.atoDataPorts?.request)
+    return window.atoDataPorts.request(port, operation, args, key);
+  return atoInstanceOperations.prepare(operation, args, key);
+}
+window.__atoBoardSetPort = (port) => {
+  window.__atoBoardPort = port || DEFAULT_BOARD_PORT;
+  try {
+    window.localStorage.setItem("ato.board.port", window.__atoBoardPort);
+  } catch {}
+  return window.__atoBoardSync ? window.__atoBoardSync() : null;
+};
 const operationRetry = document.createElement("button");
 operationRetry.textContent = "結果を確認";
 operationRetry.className = "secondary";
@@ -48,7 +79,7 @@ async function refreshBoard() {
   const sequence = ++boardReadSequence;
   boardReading++;
   try {
-    const handle = await atoInstanceOperations.prepare(
+    const handle = await prepareOnPort(
       "todo_board",
       {},
       crypto.randomUUID(),
@@ -152,7 +183,7 @@ async function runOperation(id, args, onSuccess) {
   operationBusy = true;
   setOperationControls();
   try {
-    intent.handle ??= await atoInstanceOperations.prepare(
+    intent.handle ??= await prepareOnPort(
       id,
       intent.input,
       intent.key,
