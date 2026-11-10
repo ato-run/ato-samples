@@ -27,13 +27,17 @@ authority.
 ## Personal and team board in one instance
 
 The Board selector switches which Port the instance drives: **Personal**
-(`tasks`) or **Ato Team** (`team_tasks`). It changes the view and the write
-target only — the two Resources are never merged or copied, and the team option
-is shown as `Ato Team（未接続）` when the instance has no binding for it.
+(`tasks`), **Ato Team** (`team_tasks`), or **All**. Personal and Ato Team change
+the view and the write target only — the two Resources are never merged or
+copied, and the team option is shown as `Ato Team（未接続）` when the instance has
+no binding for it. **All** is a read-only display over both observations: it
+composes the two boards for reading and refuses every edit, so it can never
+create a third source of truth.
 
 `e2e/board-team-context.cjs` proves it against a real Coordinator: one instance
 binds both Ports, the browser shows only the personal task, switching the
-selector shows only the team task, and no page errors occur.
+selector shows only the team task, and **All** shows both tasks read-only — with
+no page errors.
 
 ## What the runtime enforces
 
