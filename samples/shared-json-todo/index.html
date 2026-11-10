@@ -9,14 +9,14 @@
     <meta name="theme-color" content="#f6f7f9" />
     <meta
       name="description"
-      content="ato.run向け、クライアントサイドだけで動く同期対応タスク管理ボード"
+      content="Kanban・Tickets・Roadmapを同じタスクで切り替えるTask Board"
     />
     <title>Task Board</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./workspace.css" />
   </head>
   <body data-project-operations="false">
-    <main class="app-shell">
+    <div class="app-shell">
       <aside class="workspace-rail" aria-label="アプリ内ナビゲーション">
         <button
           id="railToggle"
@@ -28,66 +28,45 @@
         </button>
         <nav aria-label="ワークスペース">
           <button
+            id="ticketsNav"
             aria-label="All Tickets"
             data-screen="tasks"
             data-view="tickets"
           >
             ≡ <span>All Tickets</span>
           </button>
-          <button aria-label="Kanban" data-screen="tasks" data-view="kanban">
+          <button
+            id="kanbanNav"
+            aria-label="Kanban"
+            data-screen="tasks"
+            data-view="kanban"
+          >
             ▥ <span>Kanban</span>
           </button>
-          <button aria-label="Roadmap" data-screen="tasks" data-view="roadmap">
+          <button
+            id="roadmapNav"
+            aria-label="Roadmap"
+            data-screen="tasks"
+            data-view="roadmap"
+          >
             ↔ <span>Roadmap</span>
           </button>
-          <button aria-label="Projects" data-screen="projects">
+          <button id="projectsNav" aria-label="Projects" data-screen="projects">
             ▧ <span>Projects</span>
           </button>
           <button id="archivedNav" aria-label="Archived">
             ▣ <span>Archived</span>
           </button>
         </nav>
-      </aside>
-      <div class="workspace-content">
-        <header class="topbar">
-          <div class="breadcrumb">
-            <span>Task Board</span><span aria-hidden="true">/</span>
-            <h1 id="currentViewTitle">Kanban</h1>
-          </div>
+        <div class="rail-footer">
+          <span id="taskResultCount" role="status" aria-live="polite"></span>
           <div class="sync-pill" role="status" aria-live="polite">
             <span class="sync-dot"></span
             ><span id="syncLabel">正本を確認中</span>
           </div>
-        </header>
-        <div class="view-strip">
-          <div role="tablist" aria-label="タスクの表示方法">
-            <button
-              id="kanbanTab"
-              role="tab"
-              data-view="kanban"
-              aria-controls="kanbanView"
-            >
-              Kanban
-            </button>
-            <button
-              id="ticketsTab"
-              role="tab"
-              data-view="tickets"
-              aria-controls="ticketsView"
-            >
-              Tickets
-            </button>
-            <button
-              id="roadmapTab"
-              role="tab"
-              data-view="roadmap"
-              aria-controls="roadmapView"
-            >
-              Roadmap
-            </button>
-          </div>
-          <span id="taskResultCount" role="status" aria-live="polite"></span>
         </div>
+      </aside>
+      <main class="workspace-content" aria-label="Kanban">
         <section class="toolbar">
           <input
             id="searchInput"
@@ -122,29 +101,29 @@
         <div
           id="kanbanView"
           class="board-scroll"
-          role="tabpanel"
-          aria-labelledby="kanbanTab"
+          role="region"
+          aria-labelledby="kanbanNav"
           tabindex="0"
         >
           <section id="board" class="board" aria-label="タスクボード"></section>
         </div>
         <section
           id="ticketsView"
-          role="tabpanel"
-          aria-labelledby="ticketsTab"
+          role="region"
+          aria-labelledby="ticketsNav"
           tabindex="0"
           hidden
         ></section>
         <section
           id="roadmapView"
-          role="tabpanel"
-          aria-labelledby="roadmapTab"
+          role="region"
+          aria-labelledby="roadmapNav"
           tabindex="0"
           hidden
         ></section>
         <section id="projectsView" aria-label="Projects" hidden></section>
-      </div>
-    </main>
+      </main>
+    </div>
 
     <div id="modalBackdrop" class="modal-backdrop" role="presentation">
       <section

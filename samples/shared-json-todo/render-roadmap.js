@@ -206,7 +206,7 @@
   window.renderProjects = function () {
     const panel = document.getElementById("projectsView");
     panel.innerHTML =
-      '<div class="projects-head"><h2>Projects</h2>' +
+      '<div class="projects-head">' +
       (document.body.dataset.projectOperations === "true"
         ? '<button class="primary" data-new-project>＋ New project</button>'
         : "<p>Projectの永続化は新しいTODO契約への切替が必要です</p>") +

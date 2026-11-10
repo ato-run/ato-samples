@@ -182,18 +182,28 @@
       ui.screen === "projects"
         ? "Projects"
         : { kanban: "Kanban", tickets: "Tickets", roadmap: "Roadmap" }[ui.view];
-    document.getElementById("currentViewTitle").textContent = name;
-    document.querySelectorAll("[role=tab][data-view]").forEach((tab) => {
-      const selected = tab.dataset.view === ui.view && ui.screen === "tasks";
-      tab.setAttribute("aria-selected", String(selected));
-      tab.tabIndex = selected ? 0 : -1;
-    });
+    content.setAttribute("aria-label", name);
+    const includeArchived = archive?.getAttribute("aria-pressed") === "true";
+    document
+      .querySelectorAll(".workspace-rail nav button")
+      .forEach((button) => {
+        const selected =
+          button.id === "archivedNav"
+            ? ui.screen === "tasks" && ui.view === "tickets" && includeArchived
+            : button.dataset.screen === "projects"
+              ? ui.screen === "projects"
+              : ui.screen === "tasks" &&
+                button.dataset.view === ui.view &&
+                !(ui.view === "tickets" && includeArchived);
+        if (selected) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+        button.title = button.getAttribute("aria-label");
+      });
     for (const view of ["kanban", "tickets", "roadmap"])
       document.getElementById(view + "View").hidden =
         unavailable || ui.screen !== "tasks" || ui.view !== view;
     document.getElementById("projectsView").hidden =
       unavailable || ui.screen !== "projects";
-    document.querySelector(".view-strip").hidden = ui.screen !== "tasks";
     document.getElementById("taskResultCount").textContent =
       selectors.tasks().length + " tickets";
     if (!unavailable && ui.screen === "projects") window.renderProjects();
@@ -272,7 +282,14 @@
   });
   document.addEventListener("click", (event) => {
     const tab = event.target.closest("[data-view]");
-    if (tab) setView(tab.dataset.view, tab.dataset.screen || "tasks");
+    if (tab) {
+      if (
+        tab.dataset.view === "tickets" &&
+        archive?.getAttribute("aria-pressed") === "true"
+      )
+        archive.click();
+      setView(tab.dataset.view, tab.dataset.screen || "tasks");
+    }
     if (event.target.closest('[data-screen="projects"]')) {
       ui.screen = "projects";
       render();
@@ -328,21 +345,24 @@
         )
       )
         return;
-      const tab = event.target.closest("[role=tab]");
+      const navigation = event.target.closest(".workspace-rail nav button");
       if (
-        tab &&
-        ["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+        navigation &&
+        ["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
       ) {
         event.preventDefault();
-        const tabs = [...document.querySelectorAll("[role=tab]")];
-        const n =
+        const buttons = [
+          ...document.querySelectorAll(".workspace-rail nav button"),
+        ];
+        const index =
           event.key === "Home"
             ? 0
             : event.key === "End"
-              ? 2
-              : (tabs.indexOf(tab) + (event.key === "ArrowRight" ? 1 : 2)) % 3;
-        setView(tabs[n].dataset.view);
-        tabs[n].focus();
+              ? buttons.length - 1
+              : (buttons.indexOf(navigation) +
+                  (event.key === "ArrowDown" ? 1 : buttons.length - 1)) %
+                buttons.length;
+        buttons[index].focus();
         return;
       }
       const items = [
@@ -524,6 +544,7 @@
       }
     });
   }
+  archive?.addEventListener("click", renderWorkspace);
   window.TaskBoardUI = Object.freeze({
     render: renderWorkspace,
     committed: (id) => {

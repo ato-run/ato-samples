@@ -216,7 +216,10 @@ window.__atoBoardSync = async () => {
   return loaded;
 };
 refreshBoard().then((loaded) => {
-  if (loaded) window.AtoRecurrence?.materializeToday();
+  if (loaded) {
+    showSync("同期済み");
+    window.AtoRecurrence?.materializeToday();
+  }
 });
 setTimeout(() => {
   const bridge = window.__atoInstanceState;

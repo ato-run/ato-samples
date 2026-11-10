@@ -25,3 +25,11 @@ and [draft contract](https://github.com/ato-run/ato-api/blob/feat/task-board-pro
 A comprehensive writer fence/coordinator must be implemented and reviewed before
 live migration; registry verification, explicit approval and Calendar consent
 remain separate gates. `todo.board@2` is only a local candidate name.
+
+
+Follow-up: view navigation, selected-view indication, task count and sync status
+now live only in the sidebar. Duplicate main page titles and view tabs were removed
+at the user's request. The common UI startup sync label is fixed. The 21 common
+UI/Project files still match the API branch. Production UI adoption uses an API-only
+legacy compatibility profile and is recorded in its separate production worklog;
+this sample remains the DataResource profile and is not adopted automatically.
