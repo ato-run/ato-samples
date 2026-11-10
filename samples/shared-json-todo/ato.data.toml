@@ -1,11 +1,10 @@
-# What this App needs, not which data it gets. "todo" is this App's own name
-# for the connection, not a shared data type: the protocol below says only
-# "this is JSON". The concrete Resource is chosen by the person at runtime.
+# The board lives in a user-owned DataResource. The Port names the protocol;
+# which Resource it points at is decided at runtime by the person via consent.
 schema = "ato.data-ports/1"
 
 [[port]]
-name = "todo"
-protocol = "ato.data.json@1"
+name = "tasks"
+protocol = "todo.board@1"
 scope = "user"
 access = "read_write"
 required = true
