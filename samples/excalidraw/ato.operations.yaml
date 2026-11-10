@@ -1,0 +1,65 @@
+schema: ato.operations/v2
+operations:
+  - id: scene_load
+    title: scene.load
+    description: "Load the Excalidraw scene (elements, view state, files) from the Resource."
+    semantics: observation
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/scene.js
+      export: loadScene
+    state:
+      kind: data_port
+      port: scene
+      protocol: excalidraw.scene@1
+      access: read
+    effects: {external: none}
+    expose: {mcp: true, webmcp: false}
+  - id: scene_save
+    title: scene.save
+    description: "Replace the stored Excalidraw scene with the edited scene."
+    semantics: evolution
+    input:
+      type: object
+      properties:
+        scene:
+          type: object
+      required: [scene]
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/scene.js
+      export: saveScene
+    state:
+      kind: data_port
+      port: scene
+      protocol: excalidraw.scene@1
+      access: read_write
+    effects: {external: none}
+    expose: {mcp: true, webmcp: false}
+  - id: scene_export
+    title: scene.export
+    description: "Export the stored scene document for download or handoff."
+    semantics: observation
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/scene.js
+      export: exportScene
+    state:
+      kind: data_port
+      port: scene
+      protocol: excalidraw.scene@1
+      access: read
+    effects: {external: none}
+    expose: {mcp: true, webmcp: false}

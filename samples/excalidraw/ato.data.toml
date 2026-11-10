@@ -1,0 +1,10 @@
+# The scene lives in a user-owned DataResource. The Port names the protocol;
+# which Resource it points at is decided by the person at runtime via consent.
+schema = "ato.data-ports/1"
+
+[[port]]
+name = "scene"
+protocol = "excalidraw.scene@1"
+scope = "user"
+access = "read_write"
+required = true
