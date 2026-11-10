@@ -1,0 +1,12 @@
+schema_version = "0.3"
+name = "expense-tracker-static"
+version = "0.1.0"
+type = "app"
+runtime = "web/static"
+run = "index.html"
+port = 8080
+
+[metadata]
+display_name = "Expense Tracker"
+description = "Static Personal App acceptance fixture: everything it holds lives in localStorage"
+tags = ["fixture", "static", "personal-apps"]

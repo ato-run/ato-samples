@@ -1,0 +1,10 @@
+# The board lives in a user-owned DataResource. The Port names the protocol;
+# which Resource it points at is decided at runtime by the person via consent.
+schema = "ato.data-ports/1"
+
+[[port]]
+name = "tasks"
+protocol = "todo.board@1"
+scope = "user"
+access = "read_write"
+required = true

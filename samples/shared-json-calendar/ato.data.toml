@@ -1,0 +1,16 @@
+# Operation-only: this App may invoke exactly the operations below. It cannot
+# read the board document itself — the runtime refuses a document read through
+# this Port even if the App tried one, and the owner's grant must list the same
+# operation.
+#
+# The operation name is the App's whole contract with the data. Which Resource
+# it points at is decided at runtime, by the person, through consent.
+schema = "ato.data-ports/2"
+
+[[port]]
+name = "tasks"
+protocol = "todo.board@1"
+scope = "user"
+access = "operations"
+operations = ["todo_list_due_dates"]
+required = true

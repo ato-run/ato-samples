@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f6f7f9" />
+  <meta name="description" content="ato.run向け、クライアントサイドだけで動く同期対応タスク管理ボード" />
+  <title>Task Board</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <div class="topbar">
+      <div class="brand">
+        <h1>Task Board</h1>
+        <p>ドラッグで整理。状態はクライアント側の1つのJSONとして保存され、ato.run側のlocalStorage同期にそのまま載せられます。</p>
+      </div>
+      <div class="sync-pill" title="localStorage + storage event + BroadcastChannel">
+        <span class="sync-dot"></span>
+        <span id="syncLabel">同期準備完了</span>
+      </div>
+    </div>
+
+    <section class="toolbar">
+      <input id="searchInput" class="control search" type="search" placeholder="タスクを検索…" autocomplete="off" />
+      <select id="priorityFilter" class="control" aria-label="優先度で絞り込み">
+        <option value="">すべての優先度</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+        <option value="none">優先度なし</option>
+      </select>
+      <select id="dueFilter" class="control" aria-label="期限で絞り込み">
+        <option value="">すべての期限</option>
+        <option value="overdue">期限切れ</option>
+        <option value="today">今日</option>
+        <option value="week">7日以内</option>
+        <option value="none">期限なし</option>
+      </select>
+      <button id="globalAddBtn" class="primary new-task">＋ タスクを追加</button>
+    </section>
+
+    <div class="board-scroll">
+      <section id="board" class="board" aria-label="タスクボード"></section>
+    </div>
+  </main>
+
+  <div id="modalBackdrop" class="modal-backdrop" role="presentation">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h2 id="modalTitle">タスク</h2>
+        <button id="closeModalBtn" class="close-btn" aria-label="閉じる">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="field">
+          <label for="taskTitleInput">タイトル</label>
+          <input id="taskTitleInput" class="control" maxlength="160" placeholder="例: LPを公開する" />
+        </div>
+
+        <div class="field">
+          <label for="taskDescriptionInput">説明</label>
+          <textarea id="taskDescriptionInput" class="control" maxlength="5000" placeholder="必要な情報をメモ"></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label for="taskColumnSelect">ステータス</label>
+            <select id="taskColumnSelect" class="control"></select>
+          </div>
+
+          <div class="field">
+            <label for="taskPrioritySelect">優先度</label>
+            <select id="taskPrioritySelect" class="control">
+              <option value="none">None</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="taskDueInput">期限</label>
+            <input id="taskDueInput" class="control" type="date" />
+          </div>
+        </div>
+
+        <label class="check-row">
+          <input id="taskCompletedInput" type="checkbox" />
+          タスクを完了
+        </label>
+
+        <div class="section-title">
+          <h3>サブタスク <span id="subtaskProgressLabel" style="color:var(--muted);font-weight:650"></span></h3>
+        </div>
+
+        <div id="subtaskList" class="subtask-list"></div>
+
+        <div class="add-subtask">
+          <input id="newSubtaskInput" class="control" maxlength="200" placeholder="サブタスクを追加…" />
+          <button id="addSubtaskBtn" class="secondary">追加</button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="deleteTaskBtn" class="danger">削除</button>
+        <div class="footer-actions">
+          <button id="cancelTaskBtn" class="secondary">キャンセル</button>
+          <button id="saveTaskBtn" class="primary">保存</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="./app-1.js"></script>
+  <script src="./operation-client.js"></script>
+  <script src="./app-2.js"></script>
+  <script src="./app-3.js"></script>
+  <script src="./app-4.js"></script>
+  <script src="./app-5.js"></script>
+  <script src="./app-6.js"></script>
+  <script src="./app-7.js"></script>
+</body>
+</html>
