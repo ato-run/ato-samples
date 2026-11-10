@@ -35,7 +35,33 @@ authority.
 
 ## Verification
 
-The same files are exercised by the ato-api instance-operation-bridge harness
-(real Worker, D1, Wasm QuickJS executor and Chromium): board writes, response
-loss, forged sync, Calendar's operation-only read, and revocation. Staging E2E
-with the deployed API is tracked separately; this sample does not claim it.
+The common UI and byte-identical v2 Project closure are exercised by the ato-api
+instance-operation-bridge harness (real Worker, D1, Wasm QuickJS executor and
+Chromium). The sample's existing v1 handler/catalog includes its due-date operation
+and remains unchanged; it intentionally differs from the API's v1 fixture.
+Staging E2E with the deployed API is tracked separately; this sample does not claim it.
+
+## Task Board views and Project candidate
+
+Kanban, Tickets and Roadmap share one observation and the existing Operation
+bridge. Filters, sort/group, zoom and display preferences never modify the
+Resource. The shared UI is vanilla JavaScript; touch/native DnD, archive,
+subtasks and recurrence controls remain available. Project persistence is a
+separate, unregistered `profiles/projects-v2` candidate, not an in-place change
+to `todo.board@1`. The v1 handler/declaration in this sample stays unchanged.
+
+Build from this repository root:
+
+```sh
+node scripts/build-todo-profile.mjs --profile current --out .tmp/todo-current
+node scripts/build-todo-profile.mjs --profile projects-v2 --out .tmp/todo-projects
+```
+
+The new profile uses an immutable v1 implementation copy plus a v2 wrapper;
+its closure matches the API implementation candidate. Only the original five
+MCP operations are exposed by default. Calendar's approved due-date projection
+remains task_id/title/due_at/completed; new bindings require explicit consent.
+
+Live migration, writer fencing, registry verification, staging deployment and
+production adoption are separate gates. See the [implementation contract](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/rfcs/draft/task-board-project-views.md).
+The preview command is read-only and performs no copy, bind, grant or deletion.

@@ -1,0 +1,659 @@
+schema: ato.operations/v2
+operations:
+  - id: todo_list
+    title: todo.list
+    description: "Task Boardに保存されているTODOを一覧取得する。各TODOには #001 形式の通し番号 ref を含む"
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: listTodos
+    semantics: observation
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_get
+    title: todo.get
+    description: "内部IDまたは #023 のような通し番号を指定してTask BoardのTODOを1件取得する"
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+      required:
+        - id
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: getTodo
+    semantics: observation
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_get_by_number
+    title: todo.get_by_number
+    description: TODOの通し番号を指定して詳細を取得する。#023 と言われた場合は number=23 を渡す
+    input:
+      type: object
+      properties:
+        number:
+          type: integer
+          minimum: 1
+      required:
+        - number
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: getTodoByNumber
+    semantics: observation
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_create
+    title: todo.create
+    description: Task Boardに新しいTODOを作成する
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 5000
+        column_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        priority:
+          type: string
+          enum:
+            - none
+            - low
+            - medium
+            - high
+        due_at:
+          type: string
+          maxLength: 32
+        completed:
+          type: boolean
+        subtasks:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                minLength: 1
+                maxLength: 256
+              title:
+                type: string
+                minLength: 1
+                maxLength: 240
+              completed:
+                type: boolean
+              order:
+                type: integer
+                minimum: 0
+            required:
+              - title
+            additionalProperties: false
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+        project_id:
+          type: string
+          maxLength: 256
+      required:
+        - title
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: createTodo
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_update
+    title: todo.update
+    description: "内部IDまたは #023 のような通し番号を指定してTask BoardのTODOを部分更新する"
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 5000
+        column_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        priority:
+          type: string
+          enum:
+            - none
+            - low
+            - medium
+            - high
+        due_at:
+          type: string
+          maxLength: 32
+        completed:
+          type: boolean
+        archived:
+          type: boolean
+        subtasks:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                minLength: 1
+                maxLength: 256
+              title:
+                type: string
+                minLength: 1
+                maxLength: 240
+              completed:
+                type: boolean
+              order:
+                type: integer
+                minimum: 0
+            required:
+              - title
+            additionalProperties: false
+        recurrence_enabled:
+          type: boolean
+        recurrence_weekday:
+          type: integer
+          minimum: 1
+          maximum: 7
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+        expected_version:
+          type: integer
+          minimum: 0
+        project_id:
+          type: string
+          maxLength: 256
+      required:
+        - id
+        - at
+        - expected_version
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: updateTodo
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_initialize
+    title: todo.initialize
+    description: todo_initialize
+    input:
+      type: object
+      properties:
+        date:
+          type: string
+          minLength: 10
+          maxLength: 10
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - date
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: initializeBoard
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_move
+    title: todo.move
+    description: todo_move
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        column_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        target_id:
+          type: string
+          maxLength: 256
+        after:
+          type: boolean
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+        expected_version:
+          type: integer
+          minimum: 0
+      required:
+        - id
+        - column_id
+        - at
+        - expected_version
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: moveTodo
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_delete
+    title: todo.delete
+    description: todo_delete
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        expected_version:
+          type: integer
+          minimum: 0
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - id
+        - at
+        - expected_version
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: deleteTodo
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_archive_done
+    title: todo.archive_done
+    description: todo_archive_done
+    input:
+      type: object
+      properties:
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: archiveDone
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_reset
+    title: todo.reset
+    description: todo_reset
+    input:
+      type: object
+      properties:
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: resetBoard
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_replace_board
+    title: todo.replace_board
+    description: todo_replace_board
+    input:
+      type: object
+      properties:
+        board:
+          type: object
+          additionalProperties: true
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - board
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: replaceBoard
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_board
+    title: todo.board
+    description: Task Boardの正本ドキュメント全体を返す（TODO画面の描画用）
+    semantics: observation
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: boardDocument
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_project_create
+    title: todo_project_create
+    description: Projectの名称と計画期間を変更する
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 5000
+        start_date:
+          type: string
+          maxLength: 10
+        target_date:
+          type: string
+          maxLength: 10
+        expected_version:
+          type: integer
+          minimum: 0
+        at:
+          type: string
+          maxLength: 64
+      required:
+        - id
+        - name
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: createProject
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_project_update
+    title: todo_project_update
+    description: Projectの名称と計画期間を変更する
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 5000
+        start_date:
+          type: string
+          maxLength: 10
+        target_date:
+          type: string
+          maxLength: 10
+        expected_version:
+          type: integer
+          minimum: 0
+        at:
+          type: string
+          maxLength: 64
+      required:
+        - id
+        - expected_version
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: updateProject
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_project_delete
+    title: todo_project_delete
+    description: Projectだけを削除し、Ticketsと繰り返しをUnassignedへ戻す
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        confirm:
+          type: boolean
+          enum:
+            - true
+        expected_version:
+          type: integer
+          minimum: 0
+        at:
+          type: string
+          maxLength: 64
+      required:
+        - id
+        - confirm
+        - expected_version
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: deleteProject
+    semantics: evolution
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_list_due_dates
+    title: todo_list_due_dates
+    description: Calendarに公開する最小の期日投影
+    input:
+      type: object
+      properties: {}
+      required: []
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo-v2.js
+      export: listDueDates
+    semantics: observation
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@2
+      access: read
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+state_write_policy: operations_only
