@@ -1,0 +1,46 @@
+name: quick-start bundle
+
+# Builds the prebuilt three-app workspace the OSS walkthrough downloads, so
+# first-time developers install the CLI only (no npm, no Rust, no sample build).
+# Manual until the workspace release lands; attach the tarball to the release
+# from here when the owner approves the release process.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version label for the bundle
+        required: false
+        default: dev
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build the Excalidraw sample
+        working-directory: samples/excalidraw
+        run: npm ci && npm run build
+      - name: Assemble the packable Excalidraw directory
+        run: |
+          mkdir -p /tmp/excalidraw-src
+          cp -R samples/excalidraw/dist/. /tmp/excalidraw-src/
+          cp samples/excalidraw/ato.data.toml samples/excalidraw/ato.operations.yaml /tmp/excalidraw-src/
+          mkdir -p /tmp/excalidraw-src/src/operations
+          cp samples/excalidraw/src/operations/scene.js /tmp/excalidraw-src/src/operations/
+          cp .github/quickstart-excalidraw-capsule.toml /tmp/excalidraw-src/capsule.toml
+      - name: Fetch the released CLI
+        run: |
+          curl -fsSL https://github.com/ato-run/ato/releases/latest/download/ato-cli-installer.sh -o installer.sh
+          CARGO_HOME="$PWD/.cargo" sh installer.sh --no-modify-path --quiet
+      - name: Build the tarball
+        run: |
+          tools/build-quickstart-bundle.sh --out dist \
+            --ato "$PWD/.cargo/bin/ato" --excalidraw-dist /tmp/excalidraw-src \
+            --version "${{ inputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ato-oss-quick-start
+          path: dist/ato-oss-quick-start-*.tar.gz*

@@ -1,0 +1,33 @@
+# Package manifest for the built Excalidraw dist used by the quick-start bundle.
+# The sample's own capsule.toml stays source-oriented; this one packs dist/ plus
+# the declared scene operations so the bundle can run it without npm.
+schema = "ato.capsule/2"
+
+[application]
+title = "excalidraw"
+surface_path = "/"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+[contract]
+mode = "all"
+
+[[contract.observation]]
+id = "page"
+use = "ato.contract.http@1"
+port = "app.http"
+method = "GET"
+path = "/"
+status = 200
+
+[[derivation]]
+id = "web"
+use = "ato.browser@1"
+runtimes = {}
+entry = "index.html"
+
+[effects]
+default = "pure"
