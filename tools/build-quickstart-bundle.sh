@@ -39,15 +39,17 @@ out=$(cd "$out" && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/ato-quickstart.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
+pkg="$work/ato-oss-quick-start-$version"
+mkdir -p "$pkg"
 echo "packing TODO"
-"$ato" pack "$samples_dir/shared-json-todo" -o "$work/todo.capsule" >/dev/null
+"$ato" pack "$samples_dir/shared-json-todo" -o "$pkg/todo.capsule" >/dev/null
 echo "packing Calendar"
-"$ato" pack "$samples_dir/shared-json-calendar" -o "$work/calendar.capsule" >/dev/null
+"$ato" pack "$samples_dir/shared-json-calendar" -o "$pkg/calendar.capsule" >/dev/null
 echo "packing Excalidraw"
-"$ato" pack "$excalidraw_dist" -o "$work/excalidraw.capsule" >/dev/null
+"$ato" pack "$excalidraw_dist" -o "$pkg/excalidraw.capsule" >/dev/null
 
 digest() { shasum -a 256 "$1" | awk '{print "sha256:"$1}'; }
-cat > "$work/workspace.toml" <<EOF
+cat > "$pkg/workspace.toml" <<EOF
 # The OSS quick-start workspace. The capsules are prebuilt; the digests pin the
 # exact bytes the walkthrough was tested with.
 schema = "ato.workspace/1"
@@ -60,21 +62,21 @@ split = [0.4, 0.3, 0.3]
 id = "todo"
 app = "todo"
 capsule = "todo.capsule"
-digest = "$(digest "$work/todo.capsule")"
+digest = "$(digest "$pkg/todo.capsule")"
 
 [[pane]]
 id = "calendar"
 app = "calendar"
 capsule = "calendar.capsule"
-digest = "$(digest "$work/calendar.capsule")"
+digest = "$(digest "$pkg/calendar.capsule")"
 
 [[pane]]
 id = "excalidraw"
 app = "excalidraw"
 capsule = "excalidraw.capsule"
-digest = "$(digest "$work/excalidraw.capsule")"
+digest = "$(digest "$pkg/excalidraw.capsule")"
 EOF
-cat > "$work/README.md" <<EOF
+cat > "$pkg/README.md" <<EOF
 # ato OSS quick start ($version)
 
 Open this workspace with:
@@ -85,6 +87,6 @@ Then edit, press Checkpoint (Ctrl-S), and Stop and save. Resume with
 \`--checkpoint workspace.checkpoint.toml\`. See docs/guides/quick-start-first-workspace.md
 in the ato repository.
 EOF
-( cd "$work" && tar czf "$out/ato-oss-quick-start-$version.tar.gz" workspace.toml README.md todo.capsule calendar.capsule excalidraw.capsule )
+( cd "$work" && tar czf "$out/ato-oss-quick-start-$version.tar.gz" "ato-oss-quick-start-$version" )
 ( cd "$out" && shasum -a 256 "ato-oss-quick-start-$version.tar.gz" > "ato-oss-quick-start-$version.tar.gz.sha256" )
 echo "wrote $out/ato-oss-quick-start-$version.tar.gz"
