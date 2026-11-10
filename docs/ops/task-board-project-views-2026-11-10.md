@@ -42,3 +42,11 @@ port remain unchanged. Both standalone profiles build, JavaScript syntax and dif
 checks pass. Production UI adoption uses the API-only browser compatibility
 profile, not this sample. See the
 [review and final production Schema](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-mobile-design-2026-11-10.md).
+
+Kanban scrolling follow-up: horizontal mobile navigation snaps between columns;
+each labelled Task list scrolls vertically beneath its fixed header. Presentation
+offsets survive rendering, and DnD edge scrolling uses the hovered list. The four
+updated UI files match the API branch, with the same 23-file common parity. Both
+sample packages build; immutable contracts remain unchanged. The API's complete
+local Operation Bridge suite, including actual touch/keyboard/wheel scrolling,
+passes. See the [scroll/adoption record](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-kanban-scroll-2026-11-10.md).

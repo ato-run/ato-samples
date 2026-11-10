@@ -53,6 +53,7 @@
       sync = document.getElementById("syncLabel").textContent;
     footer.title = sync;
     footer.setAttribute("aria-label", sync);
+    sizeKanban();
   }
   function layoutSettings() {
     const target = mobile.matches ? display : presentation;
@@ -118,11 +119,24 @@
     },
     true,
   );
-  const visualHeight = () =>
+  function sizeKanban() {
+    const board = document.getElementById("kanbanView");
+    if (board.getClientRects().length)
+      document.documentElement.style.setProperty(
+        "--kanban-top",
+        Math.ceil(board.getBoundingClientRect().top + window.scrollY) + "px",
+      );
+  }
+  const visualHeight = () => {
     document.documentElement.style.setProperty(
       "--visual-height",
       Math.round(window.visualViewport?.height || innerHeight) + "px",
     );
+    sizeKanban();
+  };
+  const toolbarSize = new ResizeObserver(sizeKanban);
+  toolbarSize.observe(document.querySelector(".toolbar"));
+  toolbarSize.observe(document.querySelector(".view-options"));
   window.visualViewport?.addEventListener("resize", visualHeight);
   window.addEventListener("resize", visualHeight, { passive: true });
   narrow.addEventListener("change", () => setNavigation(false, false));

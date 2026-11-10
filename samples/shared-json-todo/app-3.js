@@ -57,11 +57,17 @@ function beginTouchDrag(event, kind, id) {
         : position < start + 36
           ? -Math.min(14, (start + 36 - position) / 2)
           : 0;
+    const list = document
+        .elementFromPoint(pointerX, pointerY)
+        ?.closest(".column")
+        ?.querySelector(".task-list"),
+      listBounds = list?.getBoundingClientRect();
     const previousX = scroll.scrollLeft,
-      previousY = scroll.scrollTop;
+      previousY = list?.scrollTop;
     scroll.scrollLeft += speed(pointerX, bounds.left, bounds.right);
-    scroll.scrollTop += speed(pointerY, bounds.top, bounds.bottom);
-    if (previousX !== scroll.scrollLeft || previousY !== scroll.scrollTop)
+    if (list)
+      list.scrollTop += speed(pointerY, listBounds.top, listBounds.bottom);
+    if (previousX !== scroll.scrollLeft || previousY !== list?.scrollTop)
       updateTarget(pointerX, pointerY);
     scrollFrame = requestAnimationFrame(autoScroll);
     touchDrag.scrollFrame = scrollFrame;

@@ -304,8 +304,13 @@ function formatDue(value) {
   return `${m}/${d}`;
 }
 
+const kanbanScrollOffsets = new Map();
 function render() {
   const columns = getColumns();
+  if (dom.board.getClientRects().length)
+    dom.board.querySelectorAll(".task-list").forEach((list) => {
+      kanbanScrollOffsets.set(list.dataset.columnId, list.scrollTop);
+    });
   dom.board.innerHTML = "";
   const selectedColumn = dom.column.value;
   dom.column.innerHTML = columns
@@ -328,6 +333,9 @@ function render() {
     const list = document.createElement("div");
     list.className = "task-list";
     list.dataset.columnId = column.id;
+    list.tabIndex = 0;
+    list.setAttribute("role", "region");
+    list.setAttribute("aria-label", column.title + "のタスク");
     if (!visibleTasks.length) {
       const empty = document.createElement("div");
       empty.className = "empty-column";
@@ -342,6 +350,9 @@ function render() {
   }
   installNativeDnD();
   window.TaskBoardUI?.render();
+  dom.board.querySelectorAll(".task-list").forEach((list) => {
+    list.scrollTop = kanbanScrollOffsets.get(list.dataset.columnId) || 0;
+  });
 }
 
 function renderTaskCard(task) {
