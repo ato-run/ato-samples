@@ -1868,3 +1868,613 @@ body.nav-open {
     height: 44px;
   }
 }
+
+/* Planning is a projection of the same tickets, with navigation kept in the rail. */
+.workspace-rail nav {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.planning-nav {
+  display: grid;
+  gap: 2px;
+  padding-block: 2px;
+}
+.workspace-rail .planning-nav button {
+  min-height: 44px;
+  padding-inline-start: 26px;
+  font-size: 12px;
+}
+.workspace-rail .planning-nav button[aria-pressed="true"] {
+  background: var(--panel-2);
+  color: var(--text);
+  box-shadow: inset 2px 0 var(--accent);
+}
+.workspace-rail .planning-nav button[aria-pressed="true"] .nav-symbol {
+  color: var(--accent);
+}
+.rail-collapsed:not(.nav-open) .workspace-rail .planning-nav button {
+  padding-inline: 0;
+  justify-content: center;
+}
+.planning-view {
+  min-width: 0;
+}
+.planning-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+.planning-range {
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.planning-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.planning-actions button,
+.planning-actions select {
+  min-width: 44px;
+  min-height: 44px;
+}
+.planning-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+}
+.planning-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 0 12px;
+}
+.planning-hint .ui-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+.planning-empty {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 12px;
+}
+.planning-ticket {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 12px;
+  min-height: 48px;
+  box-shadow: none;
+  font: inherit;
+}
+.planning-ticket:hover,
+.wbs-subtask-title:hover {
+  background: var(--panel-2);
+}
+.planning-ticket-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.planning-ticket .ticket-number {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.planning-ticket-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.planning-ticket-meta .ui-icon {
+  width: 14px;
+  height: 14px;
+}
+.planning-ticket.compact {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 6px 8px;
+}
+.planning-ticket.compact .planning-ticket-meta {
+  gap: 6px;
+}
+.wbs-scroll {
+  max-height: calc(100dvh - 220px);
+  min-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  overscroll-behavior: contain;
+}
+.wbs-grid {
+  --label-width: 300px;
+  width: max(100%, calc(var(--label-width) + var(--time-width)));
+}
+.wbs-row {
+  display: grid;
+  grid-template-columns: var(--label-width) minmax(var(--time-width), 1fr);
+  min-height: 58px;
+  border-bottom: 1px solid var(--line);
+}
+.wbs-row:last-child {
+  border-bottom: 0;
+}
+.wbs-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  padding-right: 6px;
+}
+.wbs-head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  min-height: 44px;
+  background: var(--panel-2);
+}
+.wbs-head .wbs-label {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel-2);
+}
+.wbs-days {
+  display: grid;
+  grid-template-columns: repeat(var(--planning-days), 1fr);
+  min-width: 0;
+}
+.wbs-day {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-right: 1px solid var(--line);
+  font-size: 10px;
+  color: var(--muted);
+  overflow: hidden;
+}
+.wbs-day.weekend {
+  background: color-mix(in srgb, var(--muted) 6%, transparent);
+}
+.wbs-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  background-image: linear-gradient(to right, var(--line) 1px, transparent 1px);
+  background-size: calc(100% / var(--planning-days)) 100%;
+}
+.wbs-group {
+  min-height: 54px;
+}
+.wbs-group .wbs-label,
+.wbs-group .wbs-track {
+  background-color: var(--panel-2);
+}
+.wbs-group strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.wbs-group small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.wbs-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 4px;
+}
+.wbs-toggle .ui-icon {
+  width: 16px;
+  height: 16px;
+}
+.wbs-toggle-spacer {
+  width: 44px;
+  flex-shrink: 0;
+}
+.wbs-task {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+.wbs-code {
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.wbs-task .planning-ticket {
+  min-width: 0;
+  flex: 1;
+}
+.wbs-no-date {
+  margin-left: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.wbs-outside {
+  margin: 4px 8px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--panel);
+  padding: 6px 12px;
+  font-size: 11px;
+}
+.wbs-deadline {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  border: 0;
+}
+.wbs-deadline .ui-icon {
+  width: 20px;
+  height: 20px;
+}
+.wbs-project-bar {
+  position: absolute;
+  display: block;
+  text-align: left;
+  min-height: 32px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.wbs-today {
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  width: 1px;
+  background: var(--accent);
+  opacity: 0.65;
+  pointer-events: none;
+}
+.wbs-subtask {
+  min-height: 44px;
+}
+.wbs-child-icon {
+  margin-left: 34px;
+  margin-right: 8px;
+  color: var(--muted);
+}
+.wbs-child-icon .ui-icon {
+  width: 14px;
+  height: 14px;
+}
+.wbs-subtask-title {
+  display: block;
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 6px;
+}
+.calendar-grid-wrap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.calendar-grid {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.calendar-grid th {
+  color: var(--muted);
+  background: var(--panel-2);
+  height: 32px;
+  text-align: center;
+  font-weight: 500;
+}
+.calendar-grid td {
+  vertical-align: top;
+  border-top: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  padding: 2px;
+  height: 150px;
+}
+.calendar-grid td:last-child {
+  border-right: 0;
+}
+.calendar-grid td.adjacent {
+  background: var(--bg);
+}
+.calendar-grid td.adjacent .calendar-date {
+  color: var(--muted);
+}
+.calendar-grid td.selected-day {
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+}
+.calendar-date {
+  min-height: 44px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.calendar-date[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.calendar-date[aria-current="date"] time {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 24px;
+  height: 24px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 50%;
+}
+.calendar-count {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.calendar-cell-tickets .planning-ticket {
+  padding: 5px 4px;
+  min-height: 44px;
+  font-size: 11px;
+}
+.calendar-cell-tickets .planning-ticket-meta {
+  display: none;
+}
+.calendar-more {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px;
+  color: var(--muted);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 11px;
+}
+.calendar-agenda {
+  margin-top: 20px;
+  border-block: 1px solid var(--line);
+  padding-block: 12px;
+}
+.calendar-agenda h2 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 12px 8px;
+}
+.calendar-agenda .section-count,
+.calendar-unscheduled .section-count {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.calendar-unscheduled {
+  margin-top: 12px;
+}
+.calendar-unscheduled summary {
+  padding: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.calendar-week-list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.calendar-week-day {
+  min-width: 0;
+  border-right: 1px solid var(--line);
+}
+.calendar-week-day:last-child {
+  border: 0;
+}
+.calendar-week-day h3 {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding-right: 8px;
+  background: var(--panel-2);
+  font-size: 11px;
+  color: var(--muted);
+}
+.calendar-week-day .planning-ticket {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+@media (max-width: 1199px) {
+  body:not(.nav-open) .workspace-rail .planning-nav button {
+    padding-inline: 0;
+    justify-content: center;
+  }
+  .wbs-grid {
+    --label-width: 240px;
+  }
+  .calendar-cell-tickets .planning-ticket-meta {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .planning-toolbar {
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .planning-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .planning-range {
+    font-size: 12px;
+  }
+  .planning-hint {
+    font-size: 11px;
+  }
+  .wbs-grid {
+    --label-width: min(174px, calc(100vw - 132px));
+  }
+  .wbs-scroll {
+    max-height: calc(100dvh - 280px);
+  }
+  .wbs-toggle,
+  .wbs-toggle-spacer {
+    width: 44px;
+    min-width: 44px;
+  }
+  .wbs-toggle {
+    min-height: 44px;
+  }
+  .wbs-task > .wbs-code {
+    display: none;
+  }
+  .wbs-task .planning-ticket {
+    padding-inline: 2px;
+  }
+  .wbs-task
+    .planning-ticket-meta
+    > span:not(.status-mark):not(.task-priority):not(.task-subtask-progress) {
+    display: none;
+  }
+  .wbs-child-icon {
+    margin-left: 22px;
+    margin-right: 2px;
+  }
+  .calendar-grid td {
+    height: 48px;
+    padding: 0;
+  }
+  .calendar-grid th {
+    height: 28px;
+  }
+  .calendar-date {
+    padding: 4px 2px;
+    min-height: 48px;
+    gap: 0;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .calendar-count {
+    height: 12px;
+    font-size: 9px;
+    line-height: 12px;
+  }
+  .calendar-cell-tickets {
+    display: none;
+  }
+  .calendar-week-list {
+    display: block;
+  }
+  .calendar-week-day {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .calendar-week-day h3 {
+    justify-content: flex-start;
+    padding-inline: 12px;
+  }
+  .calendar-week-day h3 .calendar-date {
+    width: 48px;
+    flex-direction: row;
+    gap: 4px;
+    margin-right: 6px;
+  }
+  .calendar-week-day .planning-ticket,
+  .calendar-agenda .planning-ticket,
+  .calendar-unscheduled .planning-ticket {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .calendar-week-day .planning-ticket-title,
+  .calendar-agenda .planning-ticket-title,
+  .calendar-unscheduled .planning-ticket-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .wbs-project-bar {
+    min-height: 44px;
+  }
+}

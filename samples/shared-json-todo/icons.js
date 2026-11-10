@@ -2,6 +2,8 @@
 // One local, outlined icon vocabulary. No font glyphs or remote assets.
 (function () {
   const paths = {
+    gantt:
+      '<path d="M4 3v18M4 7h6M9 12h7M14 17h7"/><path d="M10 5v4M16 10v4M21 15v4"/>',
     panel:
       '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M6 8h.01M6 12h.01"/>',
     tickets:

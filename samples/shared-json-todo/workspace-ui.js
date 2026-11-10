@@ -343,6 +343,7 @@
       ui.view !== "tickets" || ui.screen !== "tasks";
     setOperationControls();
     if (restoreFocusPending && !operationBusy) restoreEditorFocus();
+    window.TaskBoardPlanning?.updateNavigation();
     window.TaskBoardResponsive?.update();
   }
   const baseCard = renderTaskCard;

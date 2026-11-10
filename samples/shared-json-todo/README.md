@@ -86,3 +86,18 @@ remains task_id/title/due_at/completed; new bindings require explicit consent.
 Live migration, writer fencing, registry verification, staging deployment and
 production adoption are separate gates. See the [implementation contract](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/rfcs/draft/task-board-project-views.md).
 The preview command is read-only and performs no copy, bind, grant or deletion.
+
+## WBS / Gantt and calendar
+
+Open Roadmap, then choose WBS・ガント, カレンダー or 概要 in the sidebar.
+`render-planning.js` projects the same filtered Tasks; no view action writes to
+the Resource. WBS expands Projects, Tasks and subtasks with sticky labels,
+week/month/quarter zoom and Today. Only actual Project periods become bars;
+Task due dates are deadline markers and undated subtasks show progress. WBS
+hierarchy numbers are presentation-only and never replace immutable Task IDs.
+The month/week calendar includes a selected-day agenda and an undated list.
+All Task links use the existing detail drawer and Operations.
+
+The current profile retains its existing operation-only Personal/Team Ports
+and read-only All context. Project persistence remains an unregistered v2
+candidate; this UI does not migrate boards or broaden Calendar access.
