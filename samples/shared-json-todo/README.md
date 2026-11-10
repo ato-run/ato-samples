@@ -7,9 +7,10 @@ authority.
 
 ## Contract
 
-- `ato.data.toml`: one port `tasks` with protocol `todo.board@1`, scope
-  `user`, access `read_write`. The port names the app's need; it does not name
-  a shared data type.
+- `ato.data.toml` (`ato.data-ports/2`): `tasks` (scope `user`) is the person's
+  own board; `team_tasks` (scope `instance`) is the team board the same
+  instance may also connect to after explicit consent. A port names the app's
+  need; it does not name a shared data type.
 - `ato.operations.yaml` (`ato.operations/v2`): the board is read through the
   `todo_board` observation and changed through evolution operations
   (`todo_create`, `todo_update`, `todo_move`, `todo_delete`,
@@ -22,6 +23,17 @@ authority.
 - The UI (`app-*.js`, `operation-client.js`) calls operations through the
   runtime bridge and renders the committed state. It does not keep a second
   copy of the board.
+
+## Personal and team board in one instance
+
+The Board selector switches which Port the instance drives: **Personal**
+(`tasks`) or **Ato Team** (`team_tasks`). It changes the view and the write
+target only — the two Resources are never merged or copied, and the team option
+is shown as `Ato Team（未接続）` when the instance has no binding for it.
+
+`e2e/board-team-context.cjs` proves it against a real Coordinator: one instance
+binds both Ports, the browser shows only the personal task, switching the
+selector shows only the team task, and no page errors occur.
 
 ## What the runtime enforces
 

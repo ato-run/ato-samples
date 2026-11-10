@@ -1,6 +1,8 @@
-# The board lives in a user-owned DataResource. The Port names the protocol;
-# which Resource it points at is decided at runtime by the person via consent.
-schema = "ato.data-ports/1"
+# The board lives in DataResources. "tasks" is the person's own board (user
+# scope); "team_tasks" is the team board the same Instance may also connect to
+# (instance scope, explicit consent). The Port names the protocol; which
+# Resource it points at is decided at runtime by the person via consent.
+schema = "ato.data-ports/2"
 
 [[port]]
 name = "tasks"
@@ -8,3 +10,10 @@ protocol = "todo.board@1"
 scope = "user"
 access = "read_write"
 required = true
+
+[[port]]
+name = "team_tasks"
+protocol = "todo.board@1"
+scope = "instance"
+access = "read_write"
+required = false

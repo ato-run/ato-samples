@@ -32,6 +32,36 @@
     TaskBoardIcons.icon("display") +
     '<span>Display</span></summary><div class="display-fields menu-panel"><label><input type="checkbox" id="descriptionDisplay">説明を表示</label><button class="secondary" id="keyboardShortcuts" type="button" aria-pressed="false">文字ショートカットを有効にする</button><p class="keyboard-help">有効時：C 新規 · / 検索。Escで詳細を閉じ、タスクにフォーカスして↑↓で移動できます。</p></div></details>';
   toolbar.after(controls);
+  // Board context: the same Instance can hold a personal board (user Port) and
+  // a team board (instance Port). Switching changes the view and the write
+  // target only; it never merges or copies the two Resources.
+  const boardContext = document.createElement("label");
+  boardContext.className = "board-context";
+  boardContext.innerHTML =
+    '<span>Board</span><select id="boardSelect"><option value="tasks">Personal</option><option value="team_tasks">Ato Team</option></select>';
+  controls.prepend(boardContext);
+  const boardSelect = boardContext.querySelector("#boardSelect");
+  try {
+    boardSelect.value = window.localStorage.getItem("ato.board.port") || "tasks";
+  } catch {
+    boardSelect.value = "tasks";
+  }
+  Promise.resolve(window.atoDataPorts?.requirements?.())
+    .then((requirements) => {
+      const ports = new Set(
+        (requirements?.bindings ?? []).map((binding) => binding.port_name),
+      );
+      const team = boardSelect.querySelector('option[value="team_tasks"]');
+      if (team && !ports.has("team_tasks")) {
+        team.disabled = true;
+        team.textContent = "Ato Team（未接続）";
+      }
+    })
+    .catch(() => {});
+  boardSelect.addEventListener("change", () => {
+    window.__atoBoardSetPort?.(boardSelect.value);
+    setView(ui.view, ui.screen);
+  });
   const shared = controls.querySelector("#sharedFilters");
   shared.append(dom.priorityFilter, dom.dueFilter);
   const archive = document.querySelector(".archive-toggle-btn");
