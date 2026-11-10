@@ -34,6 +34,11 @@ no binding for it. **All** is a read-only display over both observations: it
 composes the two boards for reading and refuses every edit, so it can never
 create a third source of truth.
 
+The team Port has its own operation set (`todo_team_*`, `state.port:
+ team_tasks`) so the hosted runtime's Port ↔ operation contract also holds;
+the UI maps a `todo_*` operation to `todo_team_*` when the team board is
+selected. The personal board keeps the original `todo_*` operations.
+
 `e2e/board-team-context.cjs` proves it against a real Coordinator: one instance
 binds both Ports, the browser shows only the personal task, switching the
 selector shows only the team task, and **All** shows both tasks read-only — with

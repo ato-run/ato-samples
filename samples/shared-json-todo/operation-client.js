@@ -23,12 +23,23 @@ function boardPort() {
     return window.__atoBoardPort || DEFAULT_BOARD_PORT;
   }
 }
+/** The team Port has its own operation set in the manifest (state.port). */
+function operationForPort(port, operation) {
+  if (
+    port === "team_tasks" &&
+    operation.startsWith("todo_") &&
+    !operation.startsWith("todo_team_")
+  )
+    return "todo_team_" + operation.slice("todo_".length);
+  return operation;
+}
 /** Address the selected Port explicitly; fall back to the served instance Port. */
 function prepareOnPort(operation, args, key) {
   const port = boardPort();
+  const scoped = operationForPort(port, operation);
   if (window.atoDataPorts?.request)
-    return window.atoDataPorts.request(port, operation, args, key);
-  return atoInstanceOperations.prepare(operation, args, key);
+    return window.atoDataPorts.request(port, scoped, args, key);
+  return atoInstanceOperations.prepare(scoped, args, key);
 }
 window.__atoBoardSetPort = (port) => {
   window.__atoBoardPort = port || DEFAULT_BOARD_PORT;
@@ -80,7 +91,8 @@ async function loadBoardRaw(port) {
   const key = crypto.randomUUID();
   const run =
     window.atoDataPorts?.invoke && port !== boardPort()
-      ? () => window.atoDataPorts.invoke(port, "todo_board", {}, key)
+      ? () =>
+          window.atoDataPorts.invoke(port, operationForPort(port, "todo_board"), {}, key)
       : async () => {
           const handle = await prepareOnPort("todo_board", {}, key);
           try {
