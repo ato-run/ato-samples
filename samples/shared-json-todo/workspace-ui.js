@@ -46,7 +46,15 @@
   } catch {
     boardSelect.value = "tasks";
   }
-  Promise.resolve(window.atoDataPorts?.requirements?.())
+  // The hosted App host does not inject window.atoDataPorts; it serves the same
+  // answer at /__ato/data-ports. The selfhost bridge keeps its injected call.
+  const loadRequirements = () =>
+    window.atoDataPorts?.requirements
+      ? Promise.resolve(window.atoDataPorts.requirements())
+      : fetch("/__ato/data-ports", { credentials: "same-origin" })
+          .then((response) => (response.ok ? response.json() : null))
+          .catch(() => null);
+  loadRequirements()
     .then((requirements) => {
       // The hosted bridge answers {requirements:[{port_name,binding}]} while
       // the selfhost bridge answers {bindings:[{port_name}]}; accept both and
