@@ -38,7 +38,7 @@
   const boardContext = document.createElement("label");
   boardContext.className = "board-context";
   boardContext.innerHTML =
-    '<span>Board</span><select id="boardSelect"><option value="tasks">Personal</option><option value="team_tasks">Ato Team</option></select>';
+    '<span>Board</span><select id="boardSelect"><option value="tasks">Personal</option><option value="team_tasks">Ato Team</option><option value="all">All</option></select>';
   controls.prepend(boardContext);
   const boardSelect = boardContext.querySelector("#boardSelect");
   try {
@@ -55,6 +55,12 @@
       if (team && !ports.has("team_tasks")) {
         team.disabled = true;
         team.textContent = "Ato Team（未接続）";
+      }
+      const all = boardSelect.querySelector('option[value="all"]');
+      const both = ports.has("tasks") && ports.has("team_tasks");
+      if (all && ports.size > 0 && !both) {
+        all.disabled = true;
+        all.textContent = "All（両方の接続が必要）";
       }
     })
     .catch(() => {});

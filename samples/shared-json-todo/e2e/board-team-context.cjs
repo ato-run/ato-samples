@@ -1,12 +1,3 @@
-// Board context switch: one Task Board instance holds the personal board
-// (Port "tasks") and the team board (Port "team_tasks") and switches between
-// them without merging or copying either Resource.
-//
-// Start the Coordinator serving this sample, then run this file:
-//   ato-coordinator init --db .tmp/db.sqlite
-//   ato-coordinator serve --db .tmp/db.sqlite --addr 127.0.0.1:8802 --token smoke \
-//     --apps-dir samples/shared-json-todo --app-instance board-ui --app-port tasks
-//   SAMPLE_HANDLER=src/operations/todo.js NODE_PATH=<playwright> node e2e/board-team-context.cjs
 const { chromium } = require('playwright');
 const { readFile } = require('node:fs/promises');
 const BASE = process.env.COORDINATOR_URL || 'http://127.0.0.1:8802';
@@ -61,6 +52,17 @@ const call = async (method, path, body) => {
   await page.waitForTimeout(3000);
   text = await page.locator('body').innerText();
   console.log('after switch -> team visible:', text.includes('Team task'), '| personal visible:', text.includes('Personal task'));
+  const mergedPromise = (async () => {
+    await selector.selectOption('all');
+    await page.waitForTimeout(3500);
+    const merged = await page.locator('body').innerText();
+    return {
+      both: merged.includes('Personal task') && merged.includes('Team task'),
+      readOnly: await page.evaluate(() => Boolean(window.__atoBoardReadOnly)),
+    };
+  })();
+  const merged = await mergedPromise;
+  console.log('all view -> both visible:', merged.both, '| read-only:', merged.readOnly);
   console.log('page errors:', errors.length ? errors.slice(0, 3) : 'none');
   await page.screenshot({ path: '/Users/egamikohsuke/Ekoh/projects/ato-run/.tmp/board-team-context.png', fullPage: false });
   await browser.close();

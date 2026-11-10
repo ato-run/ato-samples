@@ -56,7 +56,8 @@ function setOperationControls() {
   const blocked = !!(
     operationBusy ||
     pendingOperation ||
-    window.__atoBoardError
+    window.__atoBoardError ||
+    window.__atoBoardReadOnly
   );
   for (const control of document.querySelectorAll(
     "[data-open-task],[data-add-column],[data-inline-status],#globalAddBtn,#saveTaskBtn,#deleteTaskBtn,[data-save-project],[data-delete-project],[data-new-project]",
@@ -75,28 +76,63 @@ function setOperationControls() {
     dom.saveTask.before(operationRetry);
   else dom.syncLabel.parentElement.after(operationRetry);
 }
+async function loadBoardRaw(port) {
+  const key = crypto.randomUUID();
+  const run =
+    window.atoDataPorts?.invoke && port !== boardPort()
+      ? () => window.atoDataPorts.invoke(port, "todo_board", {}, key)
+      : async () => {
+          const handle = await prepareOnPort("todo_board", {}, key);
+          try {
+            return await handle.invoke();
+          } catch (error) {
+            if (
+              error.code === "operation_state_sync_failed" &&
+              error.details?.status === "succeeded"
+            )
+              return error.details;
+            throw error;
+          }
+        };
+  const result = await run();
+  return result?.result;
+}
+/** All = read-only merge of the personal and team observations. No write target. */
+async function loadMergedBoard() {
+  const requirements = await window.atoDataPorts?.requirements?.().catch(() => null);
+  const ports = new Set(
+    (requirements?.bindings ?? []).map((binding) => binding.port_name),
+  );
+  const available = ["tasks", "team_tasks"].filter(
+    (port) => ports.size === 0 || ports.has(port),
+  );
+  const boards = [];
+  for (const port of available) boards.push(await loadBoardRaw(port));
+  const present = boards.filter(Boolean);
+  if (present.length === 0) throw new Error("board_invalid_shape");
+  const columns = present[0].columns;
+  const tasks = {};
+  present.forEach((board, index) => {
+    for (const [taskId, task] of Object.entries(board.tasks ?? {})) {
+      tasks[(available[index] || `board` + index) + ":" + taskId] = {
+        ...task,
+        id: (available[index] || `board` + index) + ":" + taskId,
+      };
+    }
+  });
+  return { ...present[0], columns, tasks };
+}
+
 async function refreshBoard() {
   const sequence = ++boardReadSequence;
   boardReading++;
   try {
-    const handle = await prepareOnPort(
-      "todo_board",
-      {},
-      crypto.randomUUID(),
-    );
-    let result;
-    try {
-      result = await handle.invoke();
-    } catch (error) {
-      if (
-        error.code === "operation_state_sync_failed" &&
-        error.details?.status === "succeeded"
-      )
-        result = error.details;
-      else throw error;
-    }
+    const merged = boardPort() === "all";
+    window.__atoBoardReadOnly = merged;
+    const value = merged
+      ? await loadMergedBoard()
+      : await loadBoardRaw(boardPort());
     if (sequence !== boardReadSequence) return false;
-    const value = result?.result;
     if (
       !value ||
       typeof value !== "object" ||
@@ -147,6 +183,10 @@ async function runOperation(id, args, onSuccess) {
     return null;
   if (operationBusy) {
     toast("保存中です");
+    return null;
+  }
+  if (window.__atoBoardReadOnly) {
+    toast("統合表示では編集できません。Personal か Ato Team を選んでください");
     return null;
   }
   if (
