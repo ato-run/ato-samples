@@ -48,8 +48,18 @@
   }
   Promise.resolve(window.atoDataPorts?.requirements?.())
     .then((requirements) => {
+      // The hosted bridge answers {requirements:[{port_name,binding}]} while
+      // the selfhost bridge answers {bindings:[{port_name}]}; accept both and
+      // count only Ports that actually have a binding.
+      const list = Array.isArray(requirements?.bindings)
+        ? requirements.bindings
+        : Array.isArray(requirements?.requirements)
+          ? requirements.requirements
+          : [];
       const ports = new Set(
-        (requirements?.bindings ?? []).map((binding) => binding.port_name),
+        list
+          .filter((entry) => entry && (entry.binding ?? true))
+          .map((entry) => entry.port_name),
       );
       const team = boardSelect.querySelector('option[value="team_tasks"]');
       if (team && !ports.has("team_tasks")) {
