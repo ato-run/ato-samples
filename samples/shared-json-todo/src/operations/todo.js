@@ -453,6 +453,38 @@ export function listDueDates({ state }) {
   return { operations: [], result: { tasks } };
 }
 
+// Team sharing: a consumer only ever sees the tasks the owner marked as shared,
+// and only the fields listed here. The rest of the board never leaves the
+// Resource, and unsharing takes effect on the next call.
+export function listSharedTasks({ state }) {
+  const board = readBoardState(state);
+  ensureTaskNumbers(board);
+  const tasks = sortedTasks(board)
+    .filter((task) => task && task.shared === true && !task.archived)
+    .map((task) => ({
+      task_id: String(task.id),
+      number: normalizeTaskNumber(task.number),
+      title: String(task.title || ""),
+      status: String(task.columnId || ""),
+      due_at:
+        typeof task.dueAt === "string" && task.dueAt ? String(task.dueAt) : null,
+    }));
+  return { operations: [], result: { tasks } };
+}
+
+export function setTaskSharing({ arguments: args, state }) {
+  const board = readBoardState(state);
+  const at = timestamp(args.at);
+  ensureTaskNumbers(board);
+  const task = resolveTask(board, args.id);
+  if (!task) throw new Error("TODO not found");
+  const shared = args.shared === true;
+  task.shared = shared;
+  if (shared) task.sharedAt = at;
+  else delete task.sharedAt;
+  return commit(board, { task_id: String(task.id), shared }, at);
+}
+
 export function listTodos({ state }) {
   const board = readBoardState(state);
   const numbered = ensureTaskNumbers(board);
