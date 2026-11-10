@@ -76,6 +76,19 @@ app = "excalidraw"
 capsule = "excalidraw.capsule"
 digest = "$(digest "$pkg/excalidraw.capsule")"
 EOF
+cat > "$pkg/bundle.json" <<EOF
+{
+  "schema": "ato.oss-quick-start/1",
+  "version": "$version",
+  "workspace": "workspace.toml",
+  "capsules": {
+    "todo": "todo.capsule",
+    "calendar": "calendar.capsule",
+    "excalidraw": "excalidraw.capsule"
+  },
+  "requires": "ato workspace open with data ports (ato >= the release that ships workspace commands)"
+}
+EOF
 cat > "$pkg/README.md" <<EOF
 # ato OSS quick start ($version)
 
