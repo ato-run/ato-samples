@@ -57,3 +57,18 @@ collapsed rail. Recovery actions remain available. All 24 common UI/Project file
 match the API branch; both sample packages build and frozen contracts are unchanged.
 The complete API browser suite, six added mobile/theme captures and centering/44px
 geometry checks passed. See the [design review and adoption](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-kanban-position-2026-11-10.md).
+
+Tickets/Roadmap follow-up: consistent mobile spacing, priority names, 16px icons,
+two-line titles and bounded timeline controls. Kanban/Tickets default to priority
+order; Tickets defaults to no grouping. The new private versioned priority-move
+Operation is enabled only in the unregistered Project candidate (and the API-only
+production browser profile). The sealed v1 handler/catalog/port stay unchanged;
+current-profile priority drag remains disabled and manual drag remains available.
+The 26 shared UI/core/Project targets are present. After integrating upstream
+sample PRs #14–16 (`f54bd63`), 24 match the API byte-for-byte; operation-client.js
+and workspace-ui.js retain the sample-only Personal/Team/All behavior. Both packages build;
+24 isolated operation tests, full browser acceptance and 12 mobile list captures
+pass. The original personal handler and adopted upstream port/declarations are
+retained. All remains read-only, including drag affordances. The upstream
+Coordinator-specific team test was retained but not rerun in this follow-up.
+See the [atomic move, review and latest adoption record](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-mobile-lists-priority-2026-11-10.md).

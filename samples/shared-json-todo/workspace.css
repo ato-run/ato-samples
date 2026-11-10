@@ -1741,3 +1741,130 @@ body.nav-open {
     padding: 8px 10px;
   }
 }
+
+/* Shared mobile list rhythm and explicit priority labels. */
+.section-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 767px) {
+  .ticket-table tr[data-ticket-id] {
+    padding: 10px 12px;
+    gap: 4px 6px;
+    border-radius: 8px;
+  }
+  .ticket-title {
+    padding-block: 1px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .ticket-status-cell {
+    flex: 0 0 auto;
+  }
+  .ticket-table .ticket-status-cell select {
+    width: 96px;
+    font-size: 13px;
+  }
+  .ticket-priority-cell {
+    margin-left: auto;
+  }
+  .ticket-priority-cell .task-priority > span {
+    display: inline;
+  }
+  .ticket-priority-cell,
+  .ticket-due-cell,
+  .ticket-subtasks-cell {
+    font-size: 12px;
+  }
+  .ticket-status .ui-icon,
+  .ticket-table .task-priority .ui-icon,
+  .ticket-table .task-date .ui-icon,
+  .ticket-table .task-subtask-progress .ui-icon,
+  .unassigned-ticket .task-meta .ui-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .unassigned-ticket {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 8px;
+    min-height: 72px;
+  }
+  .unassigned-title {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 21px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .unassigned-ticket .task-meta {
+    margin: 0;
+    gap: 6px 10px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+  .unassigned-ticket .task-meta > span {
+    margin-right: 0;
+  }
+  .project-unassigned,
+  .project-unscheduled {
+    margin-top: 16px;
+  }
+  .project-unassigned h2,
+  .project-unscheduled h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-block: 0 10px;
+  }
+  .contract-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 18px;
+    margin-block: 4px 12px;
+  }
+  .contract-note .ui-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 1px;
+  }
+  .mobile-timeline-toggle {
+    width: 100%;
+  }
+  .roadmap-toolbar > div {
+    display: grid;
+    grid-template-columns: 44px minmax(44px, 1fr) 44px;
+    width: 100%;
+  }
+  .roadmap-toolbar select {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+  }
+  .project-unscheduled .project-name {
+    min-height: 44px;
+    padding: 12px;
+  }
+  .ticket-marker {
+    width: 44px;
+    height: 44px;
+    bottom: 4px;
+  }
+  .timeline-region .project-lane:not(.timeline-head),
+  .timeline-region .project-lane:not(.timeline-head) .project-track {
+    min-height: 104px;
+  }
+  .timeline-region .project-bar {
+    top: 8px;
+    height: 44px;
+  }
+}

@@ -123,6 +123,8 @@ window.renderTickets = function () {
       .join("") +
     "</tbody></table></div>" +
     (!tasks.length
-      ? '<div class="workspace-empty">一致するタスクはありません。検索やフィルターを変更してください。<button class="secondary" data-add-column="todo">＋ New ticket</button></div>'
+      ? '<div class="workspace-empty">一致するタスクはありません。検索やフィルターを変更してください。<button class="secondary" data-add-column="todo">' +
+        TaskBoardIcons.icon("plus") +
+        " New ticket</button></div>"
       : "");
 };

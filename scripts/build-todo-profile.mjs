@@ -37,4 +37,8 @@ if (profile === "projects-v2") {
     ),
   );
 }
+if (profile === "projects-v2")
+  await writeFile(join(out, "index.html"),
+    (await readFile(join(out, "index.html"), "utf8")).replace(
+      'data-priority-move="false"', 'data-priority-move="true"'));
 console.log(out);

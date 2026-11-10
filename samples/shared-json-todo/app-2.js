@@ -1,4 +1,25 @@
 async function moveTask(taskId, columnId, targetTaskId = null, after = false) {
+  if (window.TaskBoardViewState?.sort === "priority") {
+    if (document.body.dataset.priorityMove !== "true") return;
+    if (!targetTaskId) {
+      const tasks = tasksForColumn(columnId, true).filter(
+        (t) => t.id !== taskId,
+      );
+      targetTaskId = tasks.at(-1)?.id || null;
+      after = true;
+    }
+    await runOperation("todo_move_priority_v1", {
+      id: taskId,
+      column_id: columnId,
+      target_id: targetTaskId || "",
+      after,
+      expected_revision: state.revision,
+      ...(document.body.dataset.projectOperations === "true"
+        ? { expected_version: state.tasks[taskId]?.editVersion || 0 }
+        : {}),
+    });
+    return;
+  }
   await runOperation("todo_move", {
     id: taskId,
     column_id: columnId,

@@ -216,7 +216,9 @@
     const unassigned = tasks.filter((task) => !task.projectId);
     panel.innerHTML =
       (!enabled
-        ? '<p class="contract-note">Projectの期間表示は準備中です。タスクの期日は未所属の一覧で確認できます。</p>'
+        ? '<p class="contract-note">' +
+          icon("roadmap") +
+          "<span>Projectの期間表示は準備中です。タスクの期日は未所属の一覧で確認できます。</span></p>"
         : projects.length
           ? '<div class="mobile-projects">' +
             scheduled.map((project) => projectButton(project, true)).join("") +
@@ -246,10 +248,12 @@
             .join("") +
           "</section>"
         : "") +
-      '<section class="project-unassigned"><h2>Unassigned <span>' +
+      '<section class="project-unassigned"><h2>Unassigned <span class="section-count">' +
       unassigned.length +
       "</span></h2>" +
-      taskLinks(unassigned) +
+      (unassigned.length
+        ? taskLinks(unassigned)
+        : '<p class="workspace-empty">一致する未所属のチケットはありません。検索やフィルターを確認してください。</p>') +
       "</section>";
   };
   window.renderProjects = function () {

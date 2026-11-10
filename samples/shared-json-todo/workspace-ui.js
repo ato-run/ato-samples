@@ -68,6 +68,14 @@
     window.__atoBoardSetPort?.(boardSelect.value);
     setView(ui.view, ui.screen);
   });
+  controls.querySelector("#sortSelect").value = ui.sort;
+  controls.querySelector("#groupSelect").value = ui.group;
+  const dragHelp = document.createElement("p");
+  dragHelp.className = "keyboard-help";
+  dragHelp.textContent =
+    "優先度順でカードを移動すると、移動先と同じ優先度になります。";
+  dragHelp.hidden = document.body.dataset.priorityMove !== "true";
+  controls.querySelector(".display-fields").append(dragHelp);
   const shared = controls.querySelector("#sharedFilters");
   shared.append(dom.priorityFilter, dom.dueFilter);
   const archive = document.querySelector(".archive-toggle-btn");
@@ -271,22 +279,26 @@
     if (!unavailable && ui.screen === "tasks" && ui.view === "roadmap")
       window.renderRoadmap();
     document.querySelectorAll(".task-card").forEach((card) => {
+      const canDrag =
+        !window.__atoBoardReadOnly &&
+        (ui.sort === "order" ||
+          (ui.sort === "priority" &&
+            document.body.dataset.priorityMove === "true"));
       card.draggable =
-        ui.sort === "order" &&
-        !operationBusy &&
-        !pendingOperation &&
-        !unavailable;
+        canDrag && !operationBusy && !pendingOperation && !unavailable;
       card.tabIndex = 0;
       card.setAttribute("role", "group");
       card.setAttribute(
         "aria-label",
         state.tasks[card.dataset.taskId]?.title || "タスク",
       );
-      card
-        .querySelectorAll("[data-task-handle]")
-        .forEach(
-          (handle) => (handle.disabled = ui.sort !== "order" || unavailable),
-        );
+      card.querySelectorAll("[data-task-handle]").forEach((handle) => {
+        handle.disabled = !canDrag || unavailable;
+        handle.title =
+          ui.sort === "priority"
+            ? "移動先と同じ優先度に変更"
+            : "ドラッグして並び替え";
+      });
     });
     document.querySelectorAll(".column-title").forEach((title) => {
       if (!title.querySelector(".column-status")) {
