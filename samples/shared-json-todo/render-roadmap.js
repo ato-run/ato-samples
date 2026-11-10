@@ -1,6 +1,7 @@
 "use strict";
 (function () {
-  const ui = window.TaskBoardViewState;
+  const ui = window.TaskBoardViewState,
+    icon = (name) => TaskBoardIcons.icon(name);
   const day = (value) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return null;
     const date = new Date(value + "T00:00:00Z");
@@ -25,57 +26,65 @@
     else end.setUTCMonth(end.getUTCMonth() + (ui.zoom === "quarter" ? 3 : 1));
     return { start, end, days: (end - start) / 86400000 };
   }
-  function projectTasks(project) {
-    return Object.values(state.tasks).filter((t) => t.projectId === project.id);
-  }
-  function projectButton(p) {
-    const tasks = projectTasks(p),
-      done = tasks.filter((t) => t.completed).length;
+  function progress(project) {
+    const tasks = Object.values(state.tasks).filter(
+      (task) => task.projectId === project.id,
+    );
+    const done = tasks.filter((task) => task.completed).length;
     const status =
-      p.status ||
+      project.status ||
       (tasks.length && done === tasks.length
         ? "Completed"
-        : tasks.some((t) => t.columnId === "progress")
+        : tasks.some((task) => task.columnId === "progress")
           ? "In progress"
           : "Planned");
+    return done + "/" + tasks.length + " 完了 · " + escapeHtml(status);
+  }
+  function projectButton(project, mobile = false) {
     return (
-      '<button class="project-name" data-open-project="' +
-      escapeAttr(p.id) +
+      '<button class="' +
+      (mobile ? "mobile-project-card" : "project-name") +
+      '" data-open-project="' +
+      escapeAttr(project.id) +
       '"><strong>' +
-      escapeHtml(p.name) +
+      escapeHtml(project.name) +
       "</strong><span>" +
-      done +
-      "/" +
-      tasks.length +
-      " 完了 · " +
-      escapeHtml(status) +
-      "</span></button>"
+      progress(project) +
+      "</span>" +
+      (mobile
+        ? '<span class="project-dates">' +
+          icon("calendar") +
+          escapeHtml(project.startDate + " — " + project.targetDate) +
+          "</span>"
+        : "") +
+      "</button>"
     );
   }
   function taskLinks(tasks) {
     return tasks
       .map(
-        (t) =>
+        (task) =>
           '<button class="unassigned-ticket" data-open-task="' +
-          escapeAttr(t.id) +
-          '"><span>' +
-          escapeHtml(formatTaskNumber(t.number)) +
-          " " +
-          escapeHtml(t.title) +
+          escapeAttr(task.id) +
+          '"><span class="unassigned-title"><span class="ticket-number">' +
+          escapeHtml(formatTaskNumber(task.number)) +
+          "</span> " +
+          escapeHtml(task.title) +
           '</span><span class="task-meta">' +
-          window.TaskBoardSelectors.meta(t) +
+          TaskBoardSelectors.meta(task) +
           "</span></button>",
       )
       .join("");
   }
-
   window.renderRoadmap = function () {
     const panel = document.getElementById("roadmapView"),
       { start, end, days } = range();
-    const projects = window.TaskBoardSelectors.projects().filter(
+    const enabled = document.body.dataset.projectOperations === "true";
+    const projects = TaskBoardSelectors.projects().filter(
       (p) => !ui.project || p.id === ui.project,
     );
-    const tasks = window.TaskBoardSelectors.tasks();
+    const tasks = TaskBoardSelectors.tasks(),
+      scheduled = projects.filter((p) => day(p.startDate) && day(p.targetDate));
     const pct = (date) =>
       Math.max(0, Math.min(100, ((date - start) / 86400000 / days) * 100));
     const today = day(localDateString(new Date()));
@@ -101,121 +110,171 @@
         date.getUTCDate() +
         "</span>";
     }
-    panel.innerHTML =
+    const timeline =
       '<div class="roadmap-toolbar"><span>' +
       key(start) +
       " — " +
       key(new Date(+end - 86400000)) +
-      '</span><div><button class="secondary" data-time-step="-1" aria-label="前の期間">‹</button><button class="secondary" data-time-step="0">Today</button><button class="secondary" data-time-step="1" aria-label="次の期間">›</button><label class="visually-hidden" for="roadmapZoom">タイムラインの表示範囲</label><select id="roadmapZoom">' +
+      '</span><div><button class="secondary" data-time-step="-1" aria-label="前の期間">' +
+      icon("left") +
+      '</button><button class="secondary" data-time-step="0">Today</button><button class="secondary" data-time-step="1" aria-label="次の期間">' +
+      icon("right") +
+      '</button><label class="visually-hidden" for="roadmapZoom">タイムラインの表示範囲</label><select id="roadmapZoom">' +
       ["week", "month", "quarter"]
         .map(
-          (z) =>
+          (zoom) =>
             '<option value="' +
-            z +
+            zoom +
             '"' +
-            (z === ui.zoom ? " selected" : "") +
+            (zoom === ui.zoom ? " selected" : "") +
             ">" +
-            { week: "Week", month: "Month", quarter: "Quarter" }[z] +
+            { week: "Week", month: "Month", quarter: "Quarter" }[zoom] +
             "</option>",
         )
         .join("") +
       "</select></div></div>" +
-      (document.body.dataset.projectOperations !== "true"
-        ? '<p class="contract-note">Projectの作成・期間設定は新しいTODO契約への切替後に利用できます。既存のタスクはUnassignedに表示します。</p>'
-        : "") +
-      '<p class="timeline-hint">◆ Ticketの期限 · │ Today · 横にスクロールして期間を確認</p><div class="timeline-scroll" tabindex="0" aria-label="Projectタイムライン。横にスクロールできます"><div class="project-timeline"><div class="project-lane timeline-head"><span>Project / Progress / Status</span><div class="project-track"' +
+      '<p class="timeline-hint">' +
+      icon("deadline") +
+      ' Ticketの期限 · Today線 · 横にスクロールできます</p><div class="timeline-scroll" tabindex="0" aria-label="Projectタイムライン。横にスクロールできます"><div class="project-timeline"><div class="project-lane timeline-head"><span>Project / Progress / Status</span><div class="project-track"' +
       trackStyle +
       ">" +
       ticks +
       "</div></div>" +
-      projects
-        .filter((p) => day(p.startDate) && day(p.targetDate))
-        .map((p) => {
-          const first = day(p.startDate),
-            last = day(p.targetDate),
-            after = new Date(+last + 86400000),
+      scheduled
+        .map((project) => {
+          const first = day(project.startDate),
+            after = new Date(+day(project.targetDate) + 86400000),
             outside = after <= start || first >= end;
           const own = tasks.filter(
-            (t) => t.projectId === p.id && day(t.dueAt?.slice(0, 10)),
+            (task) =>
+              task.projectId === project.id && day(task.dueAt?.slice(0, 10)),
           );
           return (
             '<div class="project-lane">' +
-            projectButton(p) +
+            projectButton(project) +
             '<div class="project-track"' +
             trackStyle +
             ">" +
             line +
             (outside
               ? '<button class="outside-project" data-time-jump="' +
-                escapeAttr(p.startDate) +
+                escapeAttr(project.startDate) +
                 '">' +
                 (after <= start ? "← " : "") +
-                escapeHtml(p.startDate + " — " + p.targetDate) +
+                escapeHtml(project.startDate + " — " + project.targetDate) +
                 (first >= end ? " →" : "") +
                 "</button>"
               : '<button class="project-bar" data-open-project="' +
-                escapeAttr(p.id) +
+                escapeAttr(project.id) +
                 '" style="left:' +
                 pct(first) +
                 "%;width:" +
                 Math.max(0.5, pct(after) - pct(first)) +
                 '%" aria-label="' +
                 escapeAttr(
-                  p.name + " " + p.startDate + " から " + p.targetDate,
+                  project.name +
+                    " " +
+                    project.startDate +
+                    " から " +
+                    project.targetDate,
                 ) +
                 '">' +
-                escapeHtml(p.name) +
+                escapeHtml(project.name) +
                 (first < start ? " ←" : "") +
                 (after > end ? " →" : "") +
                 "</button>") +
             own
               .filter(
-                (t) =>
-                  day(t.dueAt.slice(0, 10)) >= start &&
-                  day(t.dueAt.slice(0, 10)) < end,
+                (task) =>
+                  day(task.dueAt.slice(0, 10)) >= start &&
+                  day(task.dueAt.slice(0, 10)) < end,
               )
               .map(
-                (t) =>
+                (task) =>
                   '<button class="ticket-marker" data-open-task="' +
-                  escapeAttr(t.id) +
+                  escapeAttr(task.id) +
                   '" style="left:' +
-                  pct(day(t.dueAt.slice(0, 10))) +
+                  pct(day(task.dueAt.slice(0, 10))) +
                   '%" aria-label="' +
-                  escapeAttr(t.title + " 期限 " + t.dueAt.slice(0, 10)) +
-                  '">◆</button>',
+                  escapeAttr(
+                    formatTaskNumber(task.number) +
+                      " " +
+                      task.title +
+                      " 期限 " +
+                      task.dueAt.slice(0, 10),
+                  ) +
+                  '">' +
+                  icon("deadline") +
+                  "</button>",
               )
               .join("") +
             "</div></div>"
           );
         })
         .join("") +
-      '</div></div><section class="project-unscheduled"><h2>Unscheduled</h2>' +
-      projects
-        .filter((p) => !day(p.startDate) || !day(p.targetDate))
-        .map(projectButton)
-        .join("") +
-      (projects.some((p) => !day(p.startDate) || !day(p.targetDate))
-        ? ""
-        : "<p>日時未設定のProjectはありません</p>") +
-      '</section><section class="project-unassigned"><h2>Unassigned <span>' +
-      tasks.filter((t) => !t.projectId).length +
+      "</div></div>";
+    const unassigned = tasks.filter((task) => !task.projectId);
+    panel.innerHTML =
+      (!enabled
+        ? '<p class="contract-note">Projectの期間表示は準備中です。タスクの期日は未所属の一覧で確認できます。</p>'
+        : projects.length
+          ? '<div class="mobile-projects">' +
+            scheduled.map((project) => projectButton(project, true)).join("") +
+            '</div><button class="secondary mobile-timeline-toggle" data-toggle-timeline aria-expanded="' +
+            !!ui.timelineExpanded +
+            '">' +
+            icon("roadmap") +
+            (ui.timelineExpanded ? "Project一覧に戻る" : "タイムラインを表示") +
+            '</button><div class="timeline-region" data-expanded="' +
+            !!ui.timelineExpanded +
+            '">' +
+            timeline +
+            "</div>"
+          : '<div class="workspace-empty">Projectを作成すると計画期間を表示できます。<button class="secondary" data-new-project>' +
+            icon("plus") +
+            " New project</button></div>") +
+      (enabled &&
+      projects.some(
+        (project) => !day(project.startDate) || !day(project.targetDate),
+      )
+        ? '<section class="project-unscheduled"><h2>Unscheduled</h2>' +
+          projects
+            .filter(
+              (project) => !day(project.startDate) || !day(project.targetDate),
+            )
+            .map((project) => projectButton(project))
+            .join("") +
+          "</section>"
+        : "") +
+      '<section class="project-unassigned"><h2>Unassigned <span>' +
+      unassigned.length +
       "</span></h2>" +
-      taskLinks(tasks.filter((t) => !t.projectId)) +
+      taskLinks(unassigned) +
       "</section>";
   };
   window.renderProjects = function () {
-    const panel = document.getElementById("projectsView");
-    panel.innerHTML =
+    document.getElementById("projectsView").innerHTML =
       '<div class="projects-head">' +
       (document.body.dataset.projectOperations === "true"
-        ? '<button class="primary" data-new-project>＋ New project</button>'
-        : "<p>Projectの永続化は新しいTODO契約への切替が必要です</p>") +
+        ? '<button class="primary" data-new-project>' +
+          icon("plus") +
+          " New project</button>"
+        : "<p>Project機能は準備中です。</p>") +
       "</div>" +
-      window.TaskBoardSelectors.projects().map(projectButton).join("");
+      TaskBoardSelectors.projects()
+        .map((project) => projectButton(project))
+        .join("");
   };
   document.addEventListener("click", (event) => {
-    const step = event.target.closest("[data-time-step]");
-    const jump = event.target.closest("[data-time-jump]");
+    const toggle = event.target.closest("[data-toggle-timeline]");
+    if (toggle) {
+      ui.timelineExpanded = !ui.timelineExpanded;
+      window.renderRoadmap();
+      document.querySelector("[data-toggle-timeline]")?.focus();
+      return;
+    }
+    const step = event.target.closest("[data-time-step]"),
+      jump = event.target.closest("[data-time-jump]");
     if (!step && !jump) return;
     if (jump) ui.anchor = jump.dataset.timeJump;
     else if (step.dataset.timeStep === "0")
@@ -239,7 +298,7 @@
     if (event.target.id === "roadmapZoom") {
       ui.zoom = event.target.value;
       window.renderRoadmap();
-      document.getElementById("roadmapZoom").focus();
+      document.getElementById("roadmapZoom")?.focus();
     }
   });
 })();

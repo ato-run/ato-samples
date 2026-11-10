@@ -1,7 +1,8 @@
 "use strict";
 window.renderTickets = function () {
   const panel = document.getElementById("ticketsView"),
-    ui = window.TaskBoardViewState;
+    ui = window.TaskBoardViewState,
+    meta = window.TaskBoardSelectors;
   const tasks = window.TaskBoardSelectors.tasks();
   const groups =
     ui.group === "none"
@@ -24,16 +25,16 @@ window.renderTickets = function () {
               tasks: tasks.filter((t) => t.columnId === c.id),
             }));
   panel.innerHTML =
-    '<div class="ticket-table-scroll" tabindex="0" aria-label="Tickets一覧。横にスクロールできます"><table class="ticket-table"><caption class="visually-hidden">同じタスクを行で表示</caption><thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Priority</th><th>Due</th><th>Subtasks</th>' +
+    '<div class="ticket-table-scroll" tabindex="0" aria-label="Tickets一覧"><table class="ticket-table" role="table"><caption class="visually-hidden">同じタスクを行で表示</caption><thead role="rowgroup"><tr role="row"><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Status</th><th scope="col">Priority</th><th scope="col">Due</th><th scope="col">Subtasks</th>' +
     (document.body.dataset.projectOperations === "true"
-      ? "<th>Project</th>"
+      ? '<th scope="col">Project</th>'
       : "") +
-    "</tr></thead><tbody>" +
+    '</tr></thead><tbody role="rowgroup">' +
     groups
       .map(
         (group) =>
           (group.tasks.length && group.title
-            ? '<tr class="ticket-group"><th colspan="' +
+            ? '<tr role="row" class="ticket-group"><th colspan="' +
               (document.body.dataset.projectOperations === "true" ? 7 : 6) +
               '">' +
               escapeHtml(group.title) +
@@ -48,11 +49,11 @@ window.renderTickets = function () {
                   ? " disabled"
                   : "";
               return (
-                '<tr data-ticket-id="' +
+                '<tr role="row" data-ticket-id="' +
                 escapeAttr(task.id) +
-                '"><td class="ticket-number">' +
+                '"><td role="cell" class="ticket-number">' +
                 escapeHtml(formatTaskNumber(task.number)) +
-                '</td><td><button type="button" class="ticket-title" data-open-task="' +
+                '</td><td role="cell" class="ticket-title-cell"><button type="button" class="ticket-title" data-open-task="' +
                 escapeAttr(task.id) +
                 '"' +
                 disabled +
@@ -65,10 +66,12 @@ window.renderTickets = function () {
                     "</p>"
                   : "") +
                 (task.recurrenceId
-                  ? '<span class="ticket-recurrence">↻ 毎週</span>'
+                  ? '<span class="ticket-recurrence">' +
+                    TaskBoardIcons.icon("repeat") +
+                    " 毎週</span>"
                   : "") +
                 "</td>" +
-                '<td><span class="ticket-status">' +
+                '<td role="cell" class="ticket-status-cell"><span class="ticket-status">' +
                 window.TaskBoardSelectors.statusMark(task) +
                 '<select aria-label="' +
                 escapeAttr(formatTaskNumber(task.number) + " ステータス") +
@@ -90,25 +93,23 @@ window.renderTickets = function () {
                   )
                   .join("") +
                 "</select></span></td>" +
-                '<td><span class="task-priority" data-priority="' +
-                escapeAttr(task.priority) +
+                '<td role="cell" class="ticket-priority-cell" data-empty="' +
+                (task.priority === "none") +
                 '">' +
-                { high: "↑ 高", medium: "＝ 中", low: "↓ 低", none: "— なし" }[
-                  task.priority
-                ] +
-                '</span></td><td class="' +
-                (isOverdue(task) ? "overdue" : "") +
+                meta.priority(task, true) +
+                "</td>" +
+                '<td role="cell" class="ticket-due-cell" data-empty="' +
+                !task.dueAt +
                 '">' +
-                (task.dueAt ? "◷ " : "") +
-                escapeHtml(task.dueAt?.slice(0, 10) || "—") +
-                (isOverdue(task) ? " 期限切れ" : "") +
-                "</td><td>☑ " +
-                task.subtasks.filter((s) => s.completed).length +
-                "/" +
-                task.subtasks.length +
+                meta.due(task, true) +
+                "</td>" +
+                '<td role="cell" class="ticket-subtasks-cell" data-empty="' +
+                !task.subtasks.length +
+                '">' +
+                meta.subtasks(task, true) +
                 "</td>" +
                 (document.body.dataset.projectOperations === "true"
-                  ? "<td>" +
+                  ? '<td role="cell" class="ticket-project-cell">' +
                     escapeHtml(
                       state.projects?.[task.projectId]?.name || "Unassigned",
                     ) +

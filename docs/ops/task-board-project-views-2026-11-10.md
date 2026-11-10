@@ -33,3 +33,12 @@ at the user's request. The common UI startup sync label is fixed. The 21 common
 UI/Project files still match the API branch. Production UI adoption uses an API-only
 legacy compatibility profile and is recorded in its separate production worklog;
 this sample remains the DataResource profile and is not adopted automatically.
+
+The strict design/mobile follow-up adds shared SVG icons, 44px mobile actions,
+responsive Tickets rows, a functioning narrow sidebar overlay, bounded options
+menus, a viewport-aware detail sheet and edge scrolling during touch drag.
+The 23 common UI/Project files match the API branch; sample v1 handler/catalog/data
+port remain unchanged. Both standalone profiles build, JavaScript syntax and diff
+checks pass. Production UI adoption uses the API-only browser compatibility
+profile, not this sample. See the
+[review and final production Schema](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-mobile-design-2026-11-10.md).

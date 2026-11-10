@@ -193,9 +193,13 @@ render();
     }
     archiveTaskBtn.style.display =
       task.completed || task.archived ? "" : "none";
-    archiveTaskBtn.textContent = task.archived
-      ? "アーカイブ解除"
-      : "アーカイブ";
+    const label = task.archived ? "アーカイブ解除" : "アーカイブ";
+    archiveTaskBtn.setAttribute("aria-label", label);
+    archiveTaskBtn.innerHTML =
+      TaskBoardIcons.icon("archive") +
+      '<span class="button-label">' +
+      label +
+      "</span>";
   };
 
   archiveToggleBtn.addEventListener("click", () => {

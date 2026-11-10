@@ -324,7 +324,7 @@ function render() {
     columnEl.dataset.columnId = column.id;
     const head = document.createElement("div");
     head.className = "column-head";
-    head.innerHTML = `<div class="column-title"><span>${escapeHtml(column.title)}</span><span class="count-badge">${visibleTasks.length}${visibleTasks.length !== allTasks.length ? `/${allTasks.length}` : ""}</span></div><button class="add-task-btn" data-add-column="${escapeAttr(column.id)}" aria-label="${escapeAttr(column.title)}にタスクを追加">＋</button>`;
+    head.innerHTML = `<div class="column-title"><span>${escapeHtml(column.title)}</span><span class="count-badge">${visibleTasks.length}${visibleTasks.length !== allTasks.length ? `/${allTasks.length}` : ""}</span></div><button class="add-task-btn" data-add-column="${escapeAttr(column.id)}" aria-label="${escapeAttr(column.title)}にタスクを追加">${TaskBoardIcons.icon("plus")}</button>`;
     const list = document.createElement("div");
     list.className = "task-list";
     list.dataset.columnId = column.id;
@@ -359,7 +359,7 @@ function renderTaskCard(task) {
   const dueTag = task.dueAt
     ? `<span class="tag ${isOverdue(task) ? "overdue" : ""}">Due ${escapeHtml(formatDue(task.dueAt))}</span>`
     : "";
-  card.innerHTML = `<div class="task-topline"><div class="task-title" data-open-task="${escapeAttr(task.id)}"><span class="task-number">${escapeHtml(formatTaskNumber(task.number))}</span>${escapeHtml(task.title)}</div><button class="drag-handle" data-task-handle="${escapeAttr(task.id)}" aria-label="ドラッグして移動">⋮⋮</button></div><div class="task-meta">${priorityTag}${dueTag}${task.completed ? `<span class="tag">Done</span>` : ""}</div>${subCount ? `<div class="sub-progress"><div class="progress-track"><i style="width:${progress}%"></i></div><div class="progress-text">${doneCount}/${subCount}</div></div>` : ""}`;
+  card.innerHTML = `<div class="task-topline"><div class="task-title" data-open-task="${escapeAttr(task.id)}"><span class="task-number">${escapeHtml(formatTaskNumber(task.number))}</span>${escapeHtml(task.title)}</div><button class="drag-handle" data-task-handle="${escapeAttr(task.id)}" aria-label="ドラッグして移動">${TaskBoardIcons.icon("grip")}</button></div><div class="task-meta">${priorityTag}${dueTag}${task.completed ? `<span class="tag">Done</span>` : ""}</div>${subCount ? `<div class="sub-progress"><div class="progress-track"><i style="width:${progress}%"></i></div><div class="progress-text">${doneCount}/${subCount}</div></div>` : ""}`;
   return card;
 }
 

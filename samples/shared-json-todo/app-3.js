@@ -1,5 +1,6 @@
 function beginTouchDrag(event, kind, id) {
-  if (event.pointerType === "mouse") return;
+  if (event.pointerType === "mouse" || event.isPrimary === false || touchDrag)
+    return;
   const handle = event.target.closest(
     kind === "task" ? "[data-task-handle]" : "[data-sub-handle]",
   );
@@ -13,6 +14,9 @@ function beginTouchDrag(event, kind, id) {
   const startX = event.clientX;
   const startY = event.clientY;
   let activated = false;
+  let pointerX = startX,
+    pointerY = startY,
+    scrollFrame = 0;
   let timer = setTimeout(() => activate(), 220);
   function activate() {
     if (activated) return;
@@ -27,6 +31,7 @@ function beginTouchDrag(event, kind, id) {
     document.body.appendChild(ghost);
     source.classList.add("dragging");
     document.body.style.userSelect = "none";
+    document.body.classList.add("touch-dragging");
     touchDrag = {
       kind,
       id,
@@ -38,7 +43,28 @@ function beginTouchDrag(event, kind, id) {
       currentTargetId: null,
       currentColumnId: null,
       after: false,
+      scrollFrame: 0,
     };
+    if (kind === "task") scrollFrame = requestAnimationFrame(autoScroll);
+  }
+  function autoScroll() {
+    if (!touchDrag) return;
+    const scroll = document.querySelector(".board-scroll"),
+      bounds = scroll.getBoundingClientRect();
+    const speed = (position, start, end) =>
+      position > end - 36
+        ? Math.min(14, (position - end + 36) / 2)
+        : position < start + 36
+          ? -Math.min(14, (start + 36 - position) / 2)
+          : 0;
+    const previousX = scroll.scrollLeft,
+      previousY = scroll.scrollTop;
+    scroll.scrollLeft += speed(pointerX, bounds.left, bounds.right);
+    scroll.scrollTop += speed(pointerY, bounds.top, bounds.bottom);
+    if (previousX !== scroll.scrollLeft || previousY !== scroll.scrollTop)
+      updateTarget(pointerX, pointerY);
+    scrollFrame = requestAnimationFrame(autoScroll);
+    touchDrag.scrollFrame = scrollFrame;
   }
   function move(e) {
     if (e.pointerId !== pointerId) return;
@@ -50,8 +76,12 @@ function beginTouchDrag(event, kind, id) {
     }
     if (!activated || !touchDrag) return;
     e.preventDefault();
-    const x = e.clientX;
-    const y = e.clientY;
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    updateTarget(pointerX, pointerY);
+  }
+  function updateTarget(x, y) {
+    if (!touchDrag) return;
     touchDrag.ghost.style.left = `${Math.min(window.innerWidth - touchDrag.ghost.offsetWidth - 6, Math.max(6, x - touchDrag.offsetX))}px`;
     touchDrag.ghost.style.top = `${Math.min(window.innerHeight - 50, Math.max(6, y - touchDrag.offsetY))}px`;
     touchDrag.ghost.style.display = "none";
@@ -59,6 +89,8 @@ function beginTouchDrag(event, kind, id) {
     touchDrag.ghost.style.display = "";
     clearDropMarkers();
     if (kind === "task") {
+      touchDrag.currentColumnId = null;
+      touchDrag.currentTargetId = null;
       const column = under?.closest(".column");
       const card = under?.closest(".task-card");
       if (column) {
@@ -77,6 +109,7 @@ function beginTouchDrag(event, kind, id) {
       const row = under?.closest(".subtask-row");
       touchDrag.currentTargetId = null;
       touchDrag.after = false;
+      touchDrag.validDrop = !!under?.closest("#subtaskList");
       if (row && row.dataset.subtaskId !== id) {
         const rect = row.getBoundingClientRect();
         touchDrag.after = y > rect.top + rect.height / 2;
@@ -96,7 +129,7 @@ function beginTouchDrag(event, kind, id) {
           touchDrag.currentTargetId,
           touchDrag.after,
         );
-      else if (kind === "subtask")
+      else if (kind === "subtask" && touchDrag.validDrop)
         moveDraftSubtask(id, touchDrag.currentTargetId, touchDrag.after);
       finishTouchDrag();
     }
@@ -109,6 +142,7 @@ function beginTouchDrag(event, kind, id) {
     cleanupListeners();
   }
   function cleanupListeners() {
+    cancelAnimationFrame(scrollFrame);
     window.removeEventListener("pointermove", move, true);
     window.removeEventListener("pointerup", end, true);
     window.removeEventListener("pointercancel", cancel, true);
@@ -123,6 +157,8 @@ function beginTouchDrag(event, kind, id) {
 
 function finishTouchDrag() {
   if (!touchDrag) return;
+  cancelAnimationFrame(touchDrag.scrollFrame);
+  document.body.classList.remove("touch-dragging");
   touchDrag.source?.classList.remove("dragging");
   touchDrag.ghost?.remove();
   document.body.style.userSelect = "";

@@ -13,7 +13,9 @@
   const controls = document.createElement("div");
   controls.className = "view-options";
   controls.innerHTML =
-    '<details id="filterMenu"><summary>Filter</summary><div class="filter-fields"><label>Status<select id="statusFilter"><option value="">すべてのステータス</option>' +
+    '<details id="filterMenu"><summary>' +
+    TaskBoardIcons.icon("filter") +
+    '<span>Filter</span><span id="filterCount" class="filter-count" hidden></span></summary><div class="filter-fields menu-panel"><label>Status<select id="statusFilter"><option value="">すべてのステータス</option>' +
     getColumns()
       .map(
         (c) =>
@@ -24,9 +26,11 @@
           "</option>",
       )
       .join("") +
-    '</select></label><div id="sharedFilters"></div></div></details><label>Group<select id="groupSelect"><option value="status">Status</option><option value="priority">Priority</option><option value="none">None</option>' +
+    '</select></label><div id="sharedFilters"></div></div></details><div class="view-presentation"><label>Group<select id="groupSelect"><option value="status">Status</option><option value="priority">Priority</option><option value="none">None</option>' +
     (projectEnabled ? '<option value="project">Project</option>' : "") +
-    '</select></label><label>Sort<select id="sortSelect"><option value="order">手動の並び順</option><option value="due">期限が近い順</option><option value="priority">優先度が高い順</option><option value="updated">更新が新しい順</option></select></label><details><summary>Display</summary><label><input type="checkbox" id="descriptionDisplay">説明を表示</label><button class="secondary" id="keyboardShortcuts" type="button" aria-pressed="false">文字ショートカットを有効にする</button><p class="keyboard-help">有効時：C 新規 · / 検索。Escで詳細を閉じ、タスクにフォーカスして↑↓で移動できます。</p></details>';
+    '</select></label><label>Sort<select id="sortSelect"><option value="order">手動の並び順</option><option value="due">期限が近い順</option><option value="priority">優先度が高い順</option><option value="updated">更新が新しい順</option></select></label></div><details id="displayMenu"><summary>' +
+    TaskBoardIcons.icon("display") +
+    '<span>Display</span></summary><div class="display-fields menu-panel"><label><input type="checkbox" id="descriptionDisplay">説明を表示</label><button class="secondary" id="keyboardShortcuts" type="button" aria-pressed="false">文字ショートカットを有効にする</button><p class="keyboard-help">有効時：C 新規 · / 検索。Escで詳細を閉じ、タスクにフォーカスして↑↓で移動できます。</p></div></details>';
   toolbar.after(controls);
   const shared = controls.querySelector("#sharedFilters");
   shared.append(dom.priorityFilter, dom.dueFilter);
@@ -37,7 +41,10 @@
     "タスク番号・タイトル・説明・サブタスクを検索",
   );
   dom.search.placeholder = "検索…";
-  dom.globalAdd.textContent = "＋ New ticket";
+  dom.globalAdd.innerHTML =
+    TaskBoardIcons.icon("plus") +
+    '<span class="button-label">New ticket</span>';
+  dom.globalAdd.setAttribute("aria-label", "タスクを追加");
   const notice = document.createElement("p");
   notice.id = "boardAvailability";
   notice.className = "board-availability";
@@ -68,6 +75,7 @@
       toast("正本と操作の結果を確認してください");
       return;
     }
+    window.TaskBoardResponsive?.closeNavigation(false);
     returnFocus = document.activeElement;
     editorCommitted = false;
     baseOpen(taskId, columnId);
@@ -88,10 +96,23 @@
           .join("");
       select.value = state.tasks[taskId]?.projectId || "";
     }
+    dom.modalBackdrop.dataset.editing = taskId ? "true" : "false";
     const task = state.tasks[taskId];
     editBasis = task?.editVersion || 0;
+    const timestamp = (value) => {
+      const date = new Date(value);
+      return value && Number.isFinite(+date)
+        ? new Intl.DateTimeFormat("ja-JP", {
+            dateStyle: "medium",
+            timeStyle: "short",
+          }).format(date)
+        : "—";
+    };
     timestamps.textContent = task
-      ? "作成 " + (task.createdAt || "—") + " · 更新 " + (task.updatedAt || "—")
+      ? "作成 " +
+        timestamp(task.createdAt) +
+        " · 更新 " +
+        timestamp(task.updatedAt)
       : "";
     initialDraft = draft();
     content.inert = true;
@@ -198,6 +219,8 @@
         if (selected) button.setAttribute("aria-current", "page");
         else button.removeAttribute("aria-current");
         button.title = button.getAttribute("aria-label");
+        if (button.dataset.screen === "projects")
+          button.hidden = !projectEnabled;
       });
     for (const view of ["kanban", "tickets", "roadmap"])
       document.getElementById(view + "View").hidden =
@@ -230,18 +253,31 @@
         );
     });
     document.querySelectorAll(".column-title").forEach((title) => {
-      if (!title.querySelector(".status-dot")) {
+      if (!title.querySelector(".column-status")) {
         const dot = document.createElement("span");
-        dot.className = "status-dot";
+        dot.className = "column-status";
         dot.dataset.status = title.closest(".column").dataset.columnId;
         dot.setAttribute("aria-hidden", "true");
+        dot.innerHTML = TaskBoardIcons.icon(dot.dataset.status);
         title.prepend(dot);
       }
     });
+    document.getElementById("groupSelect").closest("label").hidden =
+      ui.view !== "tickets" || ui.screen !== "tasks";
+    const filterCount = [
+      ui.status,
+      dom.priorityFilter.value,
+      dom.dueFilter.value,
+      ui.project,
+      includeArchived,
+    ].filter(Boolean).length;
+    document.getElementById("filterCount").hidden = !filterCount;
+    document.getElementById("filterCount").textContent = filterCount;
     document.getElementById("groupSelect").disabled =
       ui.view !== "tickets" || ui.screen !== "tasks";
     setOperationControls();
     if (restoreFocusPending && !operationBusy) restoreEditorFocus();
+    window.TaskBoardResponsive?.update();
   }
   const baseCard = renderTaskCard;
   renderTaskCard = function (task) {
@@ -283,6 +319,7 @@
   document.addEventListener("click", (event) => {
     const tab = event.target.closest("[data-view]");
     if (tab) {
+      window.TaskBoardResponsive?.closeNavigation(false);
       if (
         tab.dataset.view === "tickets" &&
         archive?.getAttribute("aria-pressed") === "true"
@@ -291,18 +328,14 @@
       setView(tab.dataset.view, tab.dataset.screen || "tasks");
     }
     if (event.target.closest('[data-screen="projects"]')) {
+      window.TaskBoardResponsive?.closeNavigation(false);
       ui.screen = "projects";
       render();
     }
     if (event.target.closest("#archivedNav")) {
+      window.TaskBoardResponsive?.closeNavigation(false);
       if (archive?.getAttribute("aria-pressed") !== "true") archive?.click();
       setView("tickets");
-    }
-    if (event.target.closest("#railToggle")) {
-      const collapsed = document.body.classList.toggle("rail-collapsed");
-      document
-        .getElementById("railToggle")
-        .setAttribute("aria-expanded", String(!collapsed));
     }
     if (event.target.closest("#keyboardShortcuts")) {
       const button = event.target.closest("button");
@@ -353,7 +386,7 @@
         event.preventDefault();
         const buttons = [
           ...document.querySelectorAll(".workspace-rail nav button"),
-        ];
+        ].filter((button) => !button.hidden && !button.disabled);
         const index =
           event.key === "Home"
             ? 0

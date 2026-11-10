@@ -34,49 +34,110 @@
   };
   const statusLabels = () =>
     Object.fromEntries(getColumns().map((c) => [c.id, c.title]));
+  const icon = (name) => window.TaskBoardIcons.icon(name);
   const statusMark = (task) =>
     '<span class="status-mark" data-status="' +
     escapeAttr(task.columnId) +
-    '" aria-hidden="true">●</span>';
+    '" aria-hidden="true">' +
+    icon(task.columnId) +
+    "</span>";
+  function priority(task, includeEmpty = false) {
+    if (task.priority === "none" && !includeEmpty) return "";
+    const label =
+      { high: "高", medium: "中", low: "低", none: "なし" }[task.priority] ||
+      "なし";
+    return (
+      '<span class="task-priority" data-priority="' +
+      escapeAttr(task.priority) +
+      '" role="img" aria-label="優先度 ' +
+      label +
+      '">' +
+      icon(task.priority) +
+      "<span>" +
+      label +
+      "</span></span>"
+    );
+  }
+  function due(task, includeEmpty = false) {
+    if (!task.dueAt)
+      return includeEmpty
+        ? '<span class="empty-value" aria-label="期限なし">—</span>'
+        : "";
+    const date = task.dueAt.slice(0, 10),
+      overdue = isOverdue(task);
+    const label = date.startsWith(new Date().getFullYear() + "-")
+      ? date.slice(5).replaceAll("-", "/")
+      : date.replaceAll("-", "/");
+    return (
+      '<time class="task-date' +
+      (overdue ? " overdue" : "") +
+      '" datetime="' +
+      escapeAttr(date) +
+      '" title="' +
+      escapeAttr(date) +
+      '" aria-label="期限 ' +
+      escapeAttr(date) +
+      (overdue ? " 期限切れ" : "") +
+      '">' +
+      icon("calendar") +
+      "<span>" +
+      escapeHtml(label) +
+      "</span>" +
+      (overdue ? '<span class="overdue-label">期限切れ</span>' : "") +
+      "</time>"
+    );
+  }
+  function subtasks(task, includeEmpty = false) {
+    if (!task.subtasks.length)
+      return includeEmpty
+        ? '<span class="empty-value" aria-label="サブタスクなし">—</span>'
+        : "";
+    const done = task.subtasks.filter((sub) => sub.completed).length;
+    return (
+      '<span class="task-subtask-progress" aria-label="サブタスク ' +
+      done +
+      "/" +
+      task.subtasks.length +
+      '">' +
+      icon("subtasks") +
+      "<span>" +
+      done +
+      "/" +
+      task.subtasks.length +
+      "</span></span>"
+    );
+  }
   function meta(task) {
     const labels = statusLabels();
-    const done = task.subtasks.filter((s) => s.completed).length;
     return (
       '<span class="task-status" data-status="' +
       escapeAttr(task.columnId) +
       '">' +
       statusMark(task) +
-      " " +
+      "<span>" +
       escapeHtml(labels[task.columnId] || task.columnId) +
-      "</span>" +
-      '<span class="task-priority" data-priority="' +
-      escapeAttr(task.priority) +
-      '">' +
-      ({ high: "↑ 高", medium: "＝ 中", low: "↓ 低", none: "— なし" }[
-        task.priority
-      ] || "— なし") +
-      "</span>" +
-      '<span class="task-date' +
-      (isOverdue(task) ? " overdue" : "") +
-      '">' +
-      (task.dueAt
-        ? "◷ " +
-          escapeHtml(task.dueAt.slice(0, 10)) +
-          (isOverdue(task) ? " 期限切れ" : "")
-        : "期限なし") +
-      "</span>" +
-      '<span class="task-subtask-progress">☑ ' +
-      done +
-      "/" +
-      task.subtasks.length +
-      "</span>" +
-      (task.recurrenceId ? '<span class="task-recurrence">↻ 毎週</span>' : "") +
-      (task.archived ? "<span>Archived</span>" : "")
+      "</span></span>" +
+      priority(task) +
+      due(task) +
+      subtasks(task) +
+      (task.recurrenceId
+        ? '<span class="task-recurrence">' +
+          icon("repeat") +
+          "<span>毎週</span></span>"
+        : "") +
+      (task.archived
+        ? '<span class="task-archived">' +
+          icon("archive") +
+          "<span>Archived</span></span>"
+        : "")
     );
   }
   window.TaskBoardSelectors = Object.freeze({
     compare,
     statusMark,
+    priority,
+    due,
+    subtasks,
     meta,
     tasks: () =>
       getColumns()

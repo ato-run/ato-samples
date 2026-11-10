@@ -95,7 +95,12 @@ function openTaskModal(taskId = null, columnId = "todo") {
   dom.newSubtask.value = "";
   renderSubtasks();
   dom.modalBackdrop.classList.add("open");
-  dom.title.focus();
+  if (!task || !matchMedia("(max-width: 767px)").matches) dom.title.focus();
+  else {
+    const dialog = dom.modalBackdrop.querySelector("[role=dialog]");
+    dialog.tabIndex = -1;
+    dialog.focus();
+  }
 }
 
 function closeModal() {
@@ -116,12 +121,12 @@ function renderSubtasks() {
     empty.textContent = "サブタスクはありません";
     dom.subtaskList.appendChild(empty);
   } else {
-    for (const sub of sorted) {
+    for (const [index, sub] of sorted.entries()) {
       const row = document.createElement("div");
       row.className = "subtask-row";
       row.dataset.subtaskId = sub.id;
       row.draggable = true;
-      row.innerHTML = `<input type="checkbox" ${sub.completed ? "checked" : ""} data-sub-check="${escapeAttr(sub.id)}" aria-label="サブタスク完了"><input class="subtask-title-input ${sub.completed ? "done" : ""}" value="${escapeAttr(sub.title)}" data-sub-title="${escapeAttr(sub.id)}" maxlength="200"><button class="drag-handle" data-sub-handle="${escapeAttr(sub.id)}" aria-label="ドラッグして並び替え">⋮⋮</button><button class="mini-btn" data-sub-delete="${escapeAttr(sub.id)}" aria-label="サブタスクを削除">×</button>`;
+      row.innerHTML = `<label class="subtask-check"><input type="checkbox" ${sub.completed ? "checked" : ""} data-sub-check="${escapeAttr(sub.id)}" aria-label="サブタスク ${index + 1} を完了"></label><input aria-label="サブタスク ${index + 1} のタイトル" class="subtask-title-input ${sub.completed ? "done" : ""}" value="${escapeAttr(sub.title)}" data-sub-title="${escapeAttr(sub.id)}" maxlength="200"><button class="drag-handle" data-sub-handle="${escapeAttr(sub.id)}" aria-label="ドラッグして並び替え">${TaskBoardIcons.icon("grip")}</button><button class="mini-btn" data-sub-delete="${escapeAttr(sub.id)}" aria-label="サブタスクを削除">${TaskBoardIcons.icon("close")}</button>`;
       dom.subtaskList.appendChild(row);
     }
   }
