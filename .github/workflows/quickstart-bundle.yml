@@ -40,6 +40,37 @@ jobs:
           tools/build-quickstart-bundle.sh --out dist \
             --ato "$PWD/.cargo/bin/ato" --excalidraw-dist /tmp/excalidraw-src \
             --version "${{ inputs.version }}"
+      - name: Verify the bundle opens with the released CLI
+        # The workspace commands are not in a published release yet, so this
+        # checks itself out with a notice instead of failing until then. Once a
+        # release carries them, this is the gate that a bundle is usable.
+        run: |
+          ato="$PWD/.cargo/bin/ato"
+          if ! "$ato" workspace open --help >/dev/null 2>&1; then
+            echo "notice: this ato release has no workspace commands yet; skipping the open check"
+            exit 0
+          fi
+          work=$(mktemp -d)
+          tar xzf dist/ato-oss-quick-start-*.tar.gz -C "$work"
+          cd "$work"/ato-oss-quick-start-*
+          "$ato" workspace open workspace.toml --local-data --no-open \
+            --checkpoint-out workspace.checkpoint.toml > open.log 2>&1 &
+          pid=$!
+          for _ in $(seq 1 300); do
+            url=$(grep -o 'http://127\.0\.0\.1:[0-9]*/' open.log | head -1 || true)
+            [ -n "$url" ] && break
+            kill -0 "$pid" 2>/dev/null || { echo "FAIL: workspace exited"; cat open.log; exit 1; }
+            sleep 0.1
+          done
+          [ -n "$url" ] || { echo "FAIL: no shell URL"; cat open.log; exit 1; }
+          html=$(curl -fsS "$url")
+          iframes=$(grep -o '<iframe' <<<"$html" | wc -l | tr -d ' ')
+          [ "$iframes" -ge 3 ] || { echo "FAIL: expected 3 panes, saw $iframes"; exit 1; }
+          stop=$(grep -o 'http://127\.0\.0\.1:[0-9]*/stop?token=[a-f0-9]*' <<<"$html" | head -1)
+          curl -fsS -X POST -o /dev/null "$stop"
+          sleep 2
+          test -f workspace.checkpoint.toml || { echo "FAIL: no checkpoint"; exit 1; }
+          echo "bundle opens with $( "$ato" --version )"
       - uses: actions/upload-artifact@v4
         with:
           name: ato-oss-quick-start
