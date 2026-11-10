@@ -50,3 +50,10 @@ updated UI files match the API branch, with the same 23-file common parity. Both
 sample packages build; immutable contracts remain unchanged. The API's complete
 local Operation Bridge suite, including actual touch/keyboard/wheel scrolling,
 passes. See the [scroll/adoption record](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-kanban-scroll-2026-11-10.md).
+
+The mobile polish adds a swipe-linked four-column indicator with click/keyboard
+selection, centers icon controls and removes healthy count/sync details from the
+collapsed rail. Recovery actions remain available. All 24 common UI/Project files
+match the API branch; both sample packages build and frozen contracts are unchanged.
+The complete API browser suite, six added mobile/theme captures and centering/44px
+geometry checks passed. See the [design review and adoption](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-kanban-position-2026-11-10.md).

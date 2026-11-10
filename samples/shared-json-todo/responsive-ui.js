@@ -53,6 +53,7 @@
       sync = document.getElementById("syncLabel").textContent;
     footer.title = sync;
     footer.setAttribute("aria-label", sync);
+    window.TaskBoardKanbanPosition?.render();
     sizeKanban();
   }
   function layoutSettings() {

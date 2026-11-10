@@ -327,6 +327,7 @@ function render() {
     const columnEl = document.createElement("section");
     columnEl.className = "column";
     columnEl.dataset.columnId = column.id;
+    columnEl.setAttribute("aria-label", column.title);
     const head = document.createElement("div");
     head.className = "column-head";
     head.innerHTML = `<div class="column-title"><span>${escapeHtml(column.title)}</span><span class="count-badge">${visibleTasks.length}${visibleTasks.length !== allTasks.length ? `/${allTasks.length}` : ""}</span></div><button class="add-task-btn" data-add-column="${escapeAttr(column.id)}" aria-label="${escapeAttr(column.title)}にタスクを追加">${TaskBoardIcons.icon("plus")}</button>`;

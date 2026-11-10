@@ -1643,3 +1643,101 @@ body.nav-open {
     scroll-snap-stop: always;
   }
 }
+
+/* Center icon controls and keep the collapsed rail quiet. */
+.add-task-btn,
+.close-btn,
+.mini-btn,
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.rail-collapsed:not(.nav-open) .workspace-rail button {
+  justify-content: center;
+  padding-inline: 0;
+}
+.rail-collapsed .rail-footer:not(:has(button:not([hidden]))) {
+  display: none;
+}
+@media (max-width: 1199px) {
+  body:not(.nav-open) .workspace-rail button {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  body:not(.nav-open) .rail-footer:not(:has(button:not([hidden]))) {
+    display: none;
+  }
+}
+.kanban-position {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--column-count, 4), minmax(0, 1fr));
+  margin-bottom: 8px;
+  isolation: isolate;
+}
+.column-step {
+  position: relative;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 6px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+  text-align: center;
+}
+.column-step::after {
+  content: "";
+  position: absolute;
+  inset-inline: 6px;
+  bottom: 5px;
+  height: 2px;
+  background: var(--line);
+  border-radius: 1px;
+}
+.column-step[aria-current="step"] {
+  color: var(--accent);
+  font-weight: 650;
+}
+.column-step:hover {
+  background: var(--panel-2);
+}
+.column-position-cursor {
+  position: absolute;
+  bottom: 5px;
+  left: 0;
+  width: calc(100% / var(--column-count, 4));
+  height: 2px;
+  transform: translateX(calc(var(--kanban-position, 0) * 100%));
+  pointer-events: none;
+}
+.column-position-cursor::after {
+  content: "";
+  position: absolute;
+  inset: 0 6px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+@media (min-width: 768px) {
+  .kanban-position {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .board-scroll {
+    scrollbar-width: none;
+  }
+  .board-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .board-scroll .column-head {
+    padding: 8px 10px;
+  }
+}
