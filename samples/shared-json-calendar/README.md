@@ -6,7 +6,7 @@ Resource the person connected, and arranges what is already there by due date.
 Delete a task in Todo and it is simply not here — there is no calendar copy to
 go stale.
 
-The root `capsule.toml` is the `ato.capsule/1` route consumed by Formation.
+The root `capsule.toml` is `ato.capsule/2` authoring: one Static Web derivation whose Contract requires `GET /` → 200. `ato pack` compiles it into a portable Application bundle.
 `fixtures/legacy-store-capsule.toml` preserves the former Store submission
 grammar as a negative Formation fixture; it must fail with
 `legacy_store_manifest` rather than falling back to a Preset.
