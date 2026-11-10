@@ -15,11 +15,13 @@ const call = async (method, path, body) => {
 };
 (async () => {
   const source = await readFile(process.env.SAMPLE_HANDLER, 'utf8');
-  const registered = await call('POST', '/v1/protocols/todo.board@1/operations', {
-    operation: 'todo_board', semantics: 'observation', access: 'read',
-    module_source: source, module_export: 'boardDocument', publisher: 'alice/app',
-  });
-  if (registered.status !== 201) throw new Error('register failed ' + JSON.stringify(registered.body));
+  for (const operation of ['todo_board', 'todo_team_board']) {
+    const registered = await call('POST', '/v1/protocols/todo.board@1/operations', {
+      operation, semantics: 'observation', access: 'read',
+      module_source: source, module_export: 'boardDocument', publisher: 'alice/app',
+    });
+    if (registered.status !== 201) throw new Error('register failed ' + JSON.stringify(registered.body));
+  }
   const makeBoard = async (taskId, title) => {
     const created = await call('POST', '/v1/data-resources', {
       protocol: 'todo.board@1',
@@ -32,7 +34,9 @@ const call = async (method, path, body) => {
   const team = await makeBoard('t1', 'Team task');
   const bind = async (resourceId, port) => {
     const bound = await call('POST', `/v1/data-resources/${resourceId}/bindings`, {
-      port, protocol: 'todo.board@1', access: 'operations', operations: ['todo_board'], instance_id: 'board-ui',
+      port, protocol: 'todo.board@1', access: 'operations',
+      operations: [port === 'team_tasks' ? 'todo_team_board' : 'todo_board'],
+      instance_id: 'board-ui',
     });
     if (bound.status !== 201) throw new Error('bind failed ' + JSON.stringify(bound.body));
   };
