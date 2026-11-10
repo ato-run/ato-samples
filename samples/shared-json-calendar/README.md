@@ -1,10 +1,8 @@
 # shared-json-calendar
 
-A calendar built by **reading someone else's JSON**, not by defining a type. It
-owns nothing: it opens the same port `shared-json-todo` does, reads the one
-Resource the person connected, and arranges what is already there by due date.
-Delete a task in Todo and it is simply not here — there is no calendar copy to
-go stale.
+A calendar built from a **projection**, not from someone else's document. It
+owns nothing: it invokes one declared observation against the Port the owner
+connected, and arranges the due dates that come back.
 
 The root `capsule.toml` is the `ato.capsule/1` route consumed by Formation.
 `fixtures/legacy-store-capsule.toml` preserves the former Store submission
@@ -14,57 +12,29 @@ grammar as a negative Formation fixture; it must fail with
 ## What it declares
 
 ```toml
+schema = "ato.data-ports/2"
+
 [[port]]
-name = "todo"
-protocol = "ato.data.json@1"
+name = "tasks"
+protocol = "todo.board@1"
 scope = "user"
-access = "read"
+access = "operations"
+operations = ["todo_list_due_dates"]
 required = true
 ```
 
-`access = "read"` is enforced by the runtime, not by this app's restraint: a
-write through this port is refused server-side. That boundary is worth proving,
-but not by having a read-only app attempt a write on every launch — the check
-lives in the browser E2E, which asks once, deliberately, from a known-good
-session.
+This is an **operation-only** Port. The calendar cannot read the board
+document, and the runtime enforces it: a document read is refused even if this
+App tried one. The operation must also appear in the owner's effective grant;
+the intersection of "Port lists it" and "owner granted it" is required.
+
+The operation returns only `task_id`, `title`, `due_at` and `completed`. The app
+shows the due date as a plain calendar date, never as an instant, and never
+claims a task's description or columns because it never receives them.
 
 ## How it knows what to read
 
-From the **description** the owner saved beside the data (and from Todo's
-source). Nothing was standardised for it: `tasks` keyed by id, `dueAt` as a
-plain `YYYY-MM-DD`, `completed` independent of `columnId`. The app shows that
-description under *How this data is organised*, as plain text — it is prose, so
-it is never rendered as markup and nothing in it is followed.
-
-That is the whole idea being demonstrated. A second app became possible because
-the shape is **written down**, not because the platform imposed one.
-
-Two consequences the code takes seriously:
-
-- **`dueAt` is a date, not an instant.** It is used as the day directly. No
-  time and no timezone is invented for it, because converting it is exactly how
-  a date slips to the 19th or the 21st for somebody.
-- **Same protocol is not same meaning.** A document this app was not written
-  for is reported as unsupported, never rendered as an empty month. The data is
-  still stored, unchanged.
-
-`completed` decides whether an entry reads as done. The column is shown beside
-it as a separate fact — this app does not reconcile the two, because on this
-board they are genuinely independent.
-
-When access is revoked or the signed-in account changes, the calendar and the
-description are cleared rather than left on screen.
-
-## Updating without polling
-
-It subscribes to the Resource and re-reads under its own authority when a
-revision lands. The notification carries no document body, and a duplicated or
-out-of-order one cannot move the view backwards.
-
-## Running it
-
-Same as its Todo half: it needs `window.ato.data`, so it runs on ato.run. Add
-it as an app and connect its `todo` port to the **same** data Todo uses. That
-adds a Binding and copies nothing, so the data is still charged once.
-
-No `health.toml`, for the same reason.
+The projection is the contract, written down in the TODO sample's
+`ato.operations.yaml`. Nothing about the board document is standardised for this
+app; if the projection is missing, the app stops visibly rather than rendering
+an empty month.

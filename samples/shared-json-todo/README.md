@@ -1,10 +1,9 @@
 # shared-json-todo
 
-A task board whose JSON is **its own**, kept in a Data Resource the account
-owns — so a second app can read the very same document.
-
-This is the writing half of the pair; `shared-json-calendar` is the reading
-half.
+A task board whose board document is **its own**, kept in a Data Resource the
+account owns — so a second app can consume exactly the projection it was
+granted. This is the writing half of the pair; `shared-json-calendar` is the
+operation-only reading half.
 
 The root `capsule.toml` is the `ato.capsule/1` route consumed by Formation.
 `fixtures/legacy-store-capsule.toml` preserves the former Store submission
@@ -13,84 +12,46 @@ grammar as a negative Formation fixture; it must fail with
 
 ## What it declares
 
-`ato.data.toml`:
+`ato.data.toml` (the owner's document Port):
 
 ```toml
+schema = "ato.data-ports/1"
+
 [[port]]
-name = "todo"
-protocol = "ato.data.json@1"
+name = "tasks"
+protocol = "todo.board@1"
 scope = "user"
 access = "read_write"
 required = true
 ```
 
-`todo` is this app's own name for the connection, not a shared data type.
-`ato.data.json@1` says only **"this is JSON"** — ato.run does not know what the
-document means, and there is no standard task type anywhere in this picture.
-Which concrete Resource satisfies the port is decided at runtime, by the
-person, through consent.
+`ato.operations.yaml` declares the board's operations against that Port with
+`schema: ato.operations/v2` and `state.kind: data_port`. The App's UI calls
+those operations (list, create, update, move, delete, …); the board document is
+the only state, and every commit is applied on the revision just read.
 
-## The shape
+The operation **`todo_list_due_dates`** is the only one a calendar needs: it
+reads the document inside the trusted handler and returns just
+`task_id`, `title`, `due_at`, `completed` for tasks that have a due date.
+Descriptions, subtasks, columns and recurrences never leave the handler.
 
-The document is the board shape the existing TODO already uses
-(`ato.task-board.state.v1`): `columns`, and `tasks` as an **object keyed by
-task id**, each task carrying a title, description, priority, subtasks, order,
-column, and a `completed` flag that is **allowed to disagree with its column**.
+## What is shared, and what is not
 
-`schema.jsonc` in this folder is the draft to paste into the data's *Data
-structure description* in Settings > Data. That text is what lets somebody
-update another app to read this data. Ato stores it and shows it; it never
-parses it and never checks the data against it.
-
-## How it writes
-
-Every change is applied **on top of the document it just read**, and committed
-against that revision:
-
-```js
-const snapshot = await port.read();
-const next = apply(snapshot.document);   // patch, never rebuild
-await port.mutate({ kind: "replace", value: next }, { expected: snapshot });
-```
-
-Four rules follow from that, and they are why this app is worth reading:
-
-1. **Never rebuild from the fields this app knows.** Merges go through
-   `merge()`, which copies whatever is there, so a field written by a newer
-   version of this app — or by a different app — survives a write from this
-   one. `merge()` uses `Object.fromEntries` rather than `Object.assign`
-   because that one DEFINES properties instead of assigning them; assigning a
-   key named `__proto__` hits the inherited setter and loses it. (ato.run
-   refuses `__proto__`, `constructor` and `prototype` as document keys, so that
-   exact key cannot reach a stored document — the habit is kept because the
-   general rule is what matters.)
-2. **Never treat an error as empty.** "Not connected", "failed to read" and
-   "unexpected shape" all stop, visibly. Empty data offers *Start a new board*
-   and waits to be asked: connecting an existing Resource that happens to be
-   `{}` must not be indistinguishable from creating one.
-3. **Never lose an edit to an unfinished save.** The compose fields clear only
-   once the write is durable, and a response that never arrived is retried as
-   the **same** operation rather than reissued — so a lost reply cannot apply
-   twice, and the next edit waits for that outcome.
-4. **Never render backwards.** A snapshot arriving mid-save is kept and applied
-   afterwards, so the view converges on the newest revision instead of
-   dropping whatever landed at an inconvenient moment.
-
-A concurrent change makes a commit lose with a conflict, and the app re-reads
-and re-applies. Last-writer-wins would quietly delete the other writer's work.
-
-When access is revoked or the signed-in account changes, the board, the compose
-form and the edit state are cleared, and a late-finishing save does not
-re-enable editing behind that.
+- The Resource document is the authoritative board. There is no local copy to
+  drift; the browser's localStorage is only a fallback when no Resource is
+  connected.
+- A second app becomes possible because the shape is written down
+  (`schema.jsonc`, and the description saved beside the data), not because the
+  platform imposed a type.
+- Consumer apps get operations, not the document. A document read through an
+  operation-only Port is refused by the runtime, and an operation that the Port
+  does not list or the owner's grant does not include is refused as well.
 
 ## Running it
 
-It needs the runtime that provides `window.ato.data`, so it runs on ato.run
-rather than from a local file. Add it as an app, then connect its `todo` port
-(Connect → **Create new data** the first time, since nothing compatible exists
-yet). Opened without that runtime it says so instead of pretending to save.
-
-No `health.toml`: every meaningful behaviour needs a signed-in account and a
-connected Resource, which the sample CI matrix cannot provide. The cross-app
-behaviour is covered by the browser E2E in `ato-pwa` and by the Data Resource
-suites in `ato-api`.
+The app uses the runtime's data-ports bridge and instance-operations bridge
+(`window.atoDataPorts` / `window.atoInstanceOperations`), so it runs against the
+hosted runtime and the self-host Coordinator without a document-read bridge.
+Static Web serving is declared by `capsule.toml`; `ato pack`/`ato run` validate
+that route, and data access is admitted separately when a Resource is connected
+and the Port grant is approved.
