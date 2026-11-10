@@ -15,7 +15,7 @@ out=
 excalidraw_dist=
 version=dev
 samples_dir=
-root=$(git rev-parse --show-toplevel)
+root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
 while [ $# -gt 0 ]; do
   case "$1" in
