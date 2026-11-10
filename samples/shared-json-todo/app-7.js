@@ -16,6 +16,7 @@
     return items.map((item, index) => {
       const raw = typeof item === "string" ? { title: item } : item || {};
       return {
+        ...raw,
         id: String(raw.id || uid("sub")),
         title: String(raw.title || ""),
         completed: !!raw.completed,
@@ -36,6 +37,7 @@
       const weekday = Number(raw.weekday);
       if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) continue;
       out[id] = {
+        ...raw,
         id,
         frequency: "weekly",
         weekday,
@@ -220,8 +222,45 @@
       "次回: " + nextOccurrenceDate(Number(recurrenceWeekdaySelect.value));
   });
 
-  const materialize = () =>
-    runOperation("todo_initialize", { date: localDateString(new Date()) });
+  function needsInitialization(date) {
+    const board = window.__atoBoardDocument;
+    if (!board) return false;
+    // The immutable v1 handler returns no changes when already initialized.
+    // Avoid submitting that no-op as a DataResource Evolution on every tab open.
+    if (
+      ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].some(
+        (day) => !board.recurrences?.["training-weekly-" + day],
+      )
+    )
+      return true;
+    const numbers = Object.values(board.tasks || {}).map((task) => task.number);
+    if (
+      numbers.some((number) => !normalizeTaskNumber(number)) ||
+      new Set(numbers).size !== numbers.length ||
+      !(
+        board.nextTaskNumber >
+        numbers.reduce((max, number) => Math.max(max, number), 0)
+      )
+    )
+      return true;
+    return Object.values(board.recurrences || {}).some(
+      (recurrence) =>
+        recurrence.enabled !== false &&
+        recurrence.frequency === "weekly" &&
+        Number(recurrence.weekday) ===
+          isoWeekday(new Date(date + "T12:00:00")) &&
+        !Object.hasOwn(
+          board.recurrenceOccurrences || {},
+          recurrence.id + "|" + date,
+        ),
+    );
+  }
+  const materialize = () => {
+    const date = localDateString(new Date());
+    return needsInitialization(date)
+      ? runOperation("todo_initialize", { date })
+      : Promise.resolve(null);
+  };
   let lastCheckedDate = localDateString(new Date());
   setTimeout(materialize, 0);
   setInterval(() => {

@@ -7,9 +7,10 @@ authority.
 
 ## Contract
 
-- `ato.data.toml`: one port `tasks` with protocol `todo.board@1`, scope
-  `user`, access `read_write`. The port names the app's need; it does not name
-  a shared data type.
+- `ato.data.toml` (`ato.data-ports/2`): `tasks` (scope `user`) is the person's
+  own board; `team_tasks` (scope `instance`) is the team board the same
+  instance may also connect to after explicit consent. A port names the app's
+  need; it does not name a shared data type.
 - `ato.operations.yaml` (`ato.operations/v2`): the board is read through the
   `todo_board` observation and changed through evolution operations
   (`todo_create`, `todo_update`, `todo_move`, `todo_delete`,
@@ -23,6 +24,26 @@ authority.
   runtime bridge and renders the committed state. It does not keep a second
   copy of the board.
 
+## Personal and team board in one instance
+
+The Board selector switches which Port the instance drives: **Personal**
+(`tasks`), **Ato Team** (`team_tasks`), or **All**. Personal and Ato Team change
+the view and the write target only — the two Resources are never merged or
+copied, and the team option is shown as `Ato Team（未接続）` when the instance has
+no binding for it. **All** is a read-only display over both observations: it
+composes the two boards for reading and refuses every edit, so it can never
+create a third source of truth.
+
+The team Port has its own operation set (`todo_team_*`, `state.port:
+ team_tasks`) so the hosted runtime's Port ↔ operation contract also holds;
+the UI maps a `todo_*` operation to `todo_team_*` when the team board is
+selected. The personal board keeps the original `todo_*` operations.
+
+`e2e/board-team-context.cjs` proves it against a real Coordinator: one instance
+binds both Ports, the browser shows only the personal task, switching the
+selector shows only the team task, and **All** shows both tasks read-only — with
+no page errors.
+
 ## What the runtime enforces
 
 - The caller's authority is checked before the handler runs: account MCP level,
@@ -35,7 +56,48 @@ authority.
 
 ## Verification
 
-The same files are exercised by the ato-api instance-operation-bridge harness
-(real Worker, D1, Wasm QuickJS executor and Chromium): board writes, response
-loss, forged sync, Calendar's operation-only read, and revocation. Staging E2E
-with the deployed API is tracked separately; this sample does not claim it.
+The common UI and byte-identical v2 Project closure are exercised by the ato-api
+instance-operation-bridge harness (real Worker, D1, Wasm QuickJS executor and
+Chromium). The sample's existing v1 handler/catalog includes its due-date operation
+and remains unchanged; it intentionally differs from the API's v1 fixture.
+Staging E2E with the deployed API is tracked separately; this sample does not claim it.
+
+## Task Board views and Project candidate
+
+Kanban, Tickets and Roadmap share one observation and the existing Operation
+bridge. Filters, sort/group, zoom and display preferences never modify the
+Resource. The shared UI is vanilla JavaScript; touch/native DnD, archive,
+subtasks and recurrence controls remain available. Project persistence is a
+separate, unregistered `profiles/projects-v2` candidate, not an in-place change
+to `todo.board@1`. The v1 handler/declaration in this sample stays unchanged.
+
+Build from this repository root:
+
+```sh
+node scripts/build-todo-profile.mjs --profile current --out .tmp/todo-current
+node scripts/build-todo-profile.mjs --profile projects-v2 --out .tmp/todo-projects
+```
+
+The new profile uses an immutable v1 implementation copy plus a v2 wrapper;
+its closure matches the API implementation candidate. Only the original five
+MCP operations are exposed by default. Calendar's approved due-date projection
+remains task_id/title/due_at/completed; new bindings require explicit consent.
+
+Live migration, writer fencing, registry verification, staging deployment and
+production adoption are separate gates. See the [implementation contract](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/rfcs/draft/task-board-project-views.md).
+The preview command is read-only and performs no copy, bind, grant or deletion.
+
+## WBS / Gantt and calendar
+
+Open Roadmap, then choose WBS・ガント, カレンダー or 概要 in the sidebar.
+`render-planning.js` projects the same filtered Tasks; no view action writes to
+the Resource. WBS expands Projects, Tasks and subtasks with sticky labels,
+week/month/quarter zoom and Today. Only actual Project periods become bars;
+Task due dates are deadline markers and undated subtasks show progress. WBS
+hierarchy numbers are presentation-only and never replace immutable Task IDs.
+The month/week calendar includes a selected-day agenda and an undated list.
+All Task links use the existing detail drawer and Operations.
+
+The current profile retains its existing operation-only Personal/Team Ports
+and read-only All context. Project persistence remains an unregistered v2
+candidate; this UI does not migrate boards or broaden Calendar access.

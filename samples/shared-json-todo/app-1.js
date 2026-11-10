@@ -50,13 +50,7 @@ let dragContext = null;
 let touchDrag = null;
 let pendingRemoteState = null;
 
-try {
-  broadcast = new BroadcastChannel(CHANNEL_NAME);
-  broadcast.onmessage = (event) => {
-    if (!event.data || event.data.clientId === CLIENT_ID) return;
-    acceptRemoteState(event.data.state, "BroadcastChannel");
-  };
-} catch (_) {}
+// Resource snapshots only arrive through the authenticated observation bridge.
 
 function nowISO() {
   return new Date().toISOString();
@@ -97,6 +91,7 @@ function normalizeState(input) {
   const columns =
     Array.isArray(s.columns) && s.columns.length
       ? s.columns.map((c, i) => ({
+          ...c,
           id: String(c.id || `column-${i}`),
           title: String(c.title || `Column ${i + 1}`),
           order: Number.isFinite(c.order) ? c.order : (i + 1) * ORDER_STEP,
@@ -119,6 +114,7 @@ function normalizeState(input) {
       : columns[0].id;
     const subtasks = Array.isArray(raw.subtasks)
       ? raw.subtasks.map((sub, i) => ({
+          ...sub,
           id: String(sub.id || uid("sub")),
           title: String(sub.title || ""),
           completed: !!sub.completed,
@@ -127,6 +123,7 @@ function normalizeState(input) {
       : [];
 
     tasks[id] = {
+      ...raw,
       id,
       number: normalizeTaskNumber(raw.number),
       columnId,
@@ -160,6 +157,7 @@ function normalizeState(input) {
   const configuredNextTaskNumber = normalizeTaskNumber(s.nextTaskNumber) || 1;
 
   return {
+    ...s,
     schemaVersion: Math.max(
       Number.isFinite(s.schemaVersion) ? s.schemaVersion : 1,
       3,
@@ -180,16 +178,11 @@ function normalizeState(input) {
 }
 
 // The board's authoritative copy is the DataResource document. The operation
-// client refreshes this snapshot from the todo_board observation; localStorage
-// is only the legacy fallback while an instance is not connected yet.
+// client refreshes this snapshot from todo_board; browser storage is never an authority.
 function rawBoardDocument() {
-  if (window.__atoBoardDocument) return window.__atoBoardDocument;
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-  } catch (_) {
-    return null;
-  }
+  return window.__atoBoardDocument || null;
 }
+
 function loadState() {
   // A failed authoritative read must not be disguised as the legacy local
   // board: show an empty view and let the sync label explain the failure.
@@ -238,10 +231,6 @@ function applyPendingRemoteIfAny() {
 
 function showSync(text) {
   dom.syncLabel.textContent = text;
-  clearTimeout(showSync._timer);
-  showSync._timer = setTimeout(() => {
-    dom.syncLabel.textContent = "同期準備完了";
-  }, 1600);
 }
 
 function toast(message) {
@@ -315,8 +304,13 @@ function formatDue(value) {
   return `${m}/${d}`;
 }
 
+const kanbanScrollOffsets = new Map();
 function render() {
   const columns = getColumns();
+  if (dom.board.getClientRects().length)
+    dom.board.querySelectorAll(".task-list").forEach((list) => {
+      kanbanScrollOffsets.set(list.dataset.columnId, list.scrollTop);
+    });
   dom.board.innerHTML = "";
   const selectedColumn = dom.column.value;
   dom.column.innerHTML = columns
@@ -333,12 +327,16 @@ function render() {
     const columnEl = document.createElement("section");
     columnEl.className = "column";
     columnEl.dataset.columnId = column.id;
+    columnEl.setAttribute("aria-label", column.title);
     const head = document.createElement("div");
     head.className = "column-head";
-    head.innerHTML = `<div class="column-title"><span>${escapeHtml(column.title)}</span><span class="count-badge">${visibleTasks.length}${visibleTasks.length !== allTasks.length ? `/${allTasks.length}` : ""}</span></div><button class="add-task-btn" data-add-column="${escapeAttr(column.id)}" aria-label="${escapeAttr(column.title)}にタスクを追加">＋</button>`;
+    head.innerHTML = `<div class="column-title"><span>${escapeHtml(column.title)}</span><span class="count-badge">${visibleTasks.length}${visibleTasks.length !== allTasks.length ? `/${allTasks.length}` : ""}</span></div><button class="add-task-btn" data-add-column="${escapeAttr(column.id)}" aria-label="${escapeAttr(column.title)}にタスクを追加">${TaskBoardIcons.icon("plus")}</button>`;
     const list = document.createElement("div");
     list.className = "task-list";
     list.dataset.columnId = column.id;
+    list.tabIndex = 0;
+    list.setAttribute("role", "region");
+    list.setAttribute("aria-label", column.title + "のタスク");
     if (!visibleTasks.length) {
       const empty = document.createElement("div");
       empty.className = "empty-column";
@@ -352,6 +350,10 @@ function render() {
     dom.board.appendChild(columnEl);
   }
   installNativeDnD();
+  window.TaskBoardUI?.render();
+  dom.board.querySelectorAll(".task-list").forEach((list) => {
+    list.scrollTop = kanbanScrollOffsets.get(list.dataset.columnId) || 0;
+  });
 }
 
 function renderTaskCard(task) {
@@ -369,7 +371,7 @@ function renderTaskCard(task) {
   const dueTag = task.dueAt
     ? `<span class="tag ${isOverdue(task) ? "overdue" : ""}">Due ${escapeHtml(formatDue(task.dueAt))}</span>`
     : "";
-  card.innerHTML = `<div class="task-topline"><div class="task-title" data-open-task="${escapeAttr(task.id)}"><span class="task-number">${escapeHtml(formatTaskNumber(task.number))}</span>${escapeHtml(task.title)}</div><button class="drag-handle" data-task-handle="${escapeAttr(task.id)}" aria-label="ドラッグして移動">⋮⋮</button></div><div class="task-meta">${priorityTag}${dueTag}${task.completed ? `<span class="tag">Done</span>` : ""}</div>${subCount ? `<div class="sub-progress"><div class="progress-track"><i style="width:${progress}%"></i></div><div class="progress-text">${doneCount}/${subCount}</div></div>` : ""}`;
+  card.innerHTML = `<div class="task-topline"><div class="task-title" data-open-task="${escapeAttr(task.id)}"><span class="task-number">${escapeHtml(formatTaskNumber(task.number))}</span>${escapeHtml(task.title)}</div><button class="drag-handle" data-task-handle="${escapeAttr(task.id)}" aria-label="ドラッグして移動">${TaskBoardIcons.icon("grip")}</button></div><div class="task-meta">${priorityTag}${dueTag}${task.completed ? `<span class="tag">Done</span>` : ""}</div>${subCount ? `<div class="sub-progress"><div class="progress-track"><i style="width:${progress}%"></i></div><div class="progress-text">${doneCount}/${subCount}</div></div>` : ""}`;
   return card;
 }
 

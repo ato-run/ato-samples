@@ -505,4 +505,524 @@ operations:
       access: read
     effects: {external: none}
     expose: {mcp: true, webmcp: false}
+  - description: 'Task Boardに保存されているTODOを一覧取得する。各TODOには #001 形式の通し番号 ref を含む（チームボード team_tasks 経由）'
+    effects:
+      external: none
+    execution:
+      export: listTodos
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_list
+    input:
+      additionalProperties: false
+      properties: {}
+      type: object
+    semantics: observation
+    state:
+      access: read
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.list
+  - description: '内部IDまたは #023 のような通し番号を指定してTask BoardのTODOを1件取得する（チームボード team_tasks 経由）'
+    effects:
+      external: none
+    execution:
+      export: getTodo
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_get
+    input:
+      additionalProperties: false
+      properties:
+        id:
+          maxLength: 256
+          minLength: 1
+          type: string
+      required:
+      - id
+      type: object
+    semantics: observation
+    state:
+      access: read
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.get
+  - description: TODOの通し番号を指定して詳細を取得する。#023 と言われた場合は number=23 を渡す（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: getTodoByNumber
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_get_by_number
+    input:
+      additionalProperties: false
+      properties:
+        number:
+          minimum: 1
+          type: integer
+      required:
+      - number
+      type: object
+    semantics: observation
+    state:
+      access: read
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.get_by_number
+  - description: Task Boardに新しいTODOを作成する（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: createTodo
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_create
+    input:
+      additionalProperties: false
+      properties:
+        at:
+          maxLength: 24
+          minLength: 24
+          type: string
+        column_id:
+          maxLength: 256
+          minLength: 1
+          type: string
+        completed:
+          type: boolean
+        description:
+          maxLength: 5000
+          type: string
+        due_at:
+          maxLength: 32
+          type: string
+        id:
+          maxLength: 256
+          minLength: 1
+          type: string
+        priority:
+          enum:
+          - none
+          - low
+          - medium
+          - high
+          type: string
+        subtasks:
+          items:
+            additionalProperties: false
+            properties:
+              completed:
+                type: boolean
+              id:
+                maxLength: 256
+                minLength: 1
+                type: string
+              order:
+                minimum: 0
+                type: integer
+              title:
+                maxLength: 240
+                minLength: 1
+                type: string
+            required:
+            - title
+            type: object
+          maxItems: 100
+          type: array
+        title:
+          maxLength: 160
+          minLength: 1
+          type: string
+      required:
+      - title
+      - at
+      type: object
+    semantics: evolution
+    state:
+      access: read_write
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.create
+  - description: '内部IDまたは #023 のような通し番号を指定してTask BoardのTODOを部分更新する（チームボード team_tasks 経由）'
+    effects:
+      external: none
+    execution:
+      export: updateTodo
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_update
+    input:
+      additionalProperties: false
+      properties:
+        archived:
+          type: boolean
+        at:
+          maxLength: 24
+          minLength: 24
+          type: string
+        column_id:
+          maxLength: 256
+          minLength: 1
+          type: string
+        completed:
+          type: boolean
+        description:
+          maxLength: 5000
+          type: string
+        due_at:
+          maxLength: 32
+          type: string
+        id:
+          maxLength: 256
+          minLength: 1
+          type: string
+        priority:
+          enum:
+          - none
+          - low
+          - medium
+          - high
+          type: string
+        recurrence_enabled:
+          type: boolean
+        recurrence_weekday:
+          maximum: 7
+          minimum: 1
+          type: integer
+        subtasks:
+          items:
+            additionalProperties: false
+            properties:
+              completed:
+                type: boolean
+              id:
+                maxLength: 256
+                minLength: 1
+                type: string
+              order:
+                minimum: 0
+                type: integer
+              title:
+                maxLength: 240
+                minLength: 1
+                type: string
+            required:
+            - title
+            type: object
+          maxItems: 100
+          type: array
+        title:
+          maxLength: 160
+          minLength: 1
+          type: string
+      required:
+      - id
+      - at
+      type: object
+    semantics: evolution
+    state:
+      access: read_write
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.update
+  - description: todo_initialize（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: initializeBoard
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_initialize
+    input:
+      additionalProperties: false
+      properties:
+        at:
+          maxLength: 24
+          minLength: 24
+          type: string
+        date:
+          maxLength: 10
+          minLength: 10
+          type: string
+      required:
+      - date
+      - at
+      type: object
+    semantics: evolution
+    state:
+      access: read_write
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.initialize
+  - description: todo_move（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: moveTodo
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_move
+    input:
+      additionalProperties: false
+      properties:
+        after:
+          type: boolean
+        at:
+          maxLength: 24
+          minLength: 24
+          type: string
+        column_id:
+          maxLength: 256
+          minLength: 1
+          type: string
+        id:
+          maxLength: 256
+          minLength: 1
+          type: string
+        target_id:
+          maxLength: 256
+          type: string
+      required:
+      - id
+      - column_id
+      - at
+      type: object
+    semantics: evolution
+    state:
+      access: read_write
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.move
+  - description: todo_delete（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: deleteTodo
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_delete
+    input:
+      additionalProperties: false
+      properties:
+        at:
+          maxLength: 24
+          minLength: 24
+          type: string
+        id:
+          maxLength: 256
+          minLength: 1
+          type: string
+      required:
+      - id
+      - at
+      type: object
+    semantics: evolution
+    state:
+      access: read_write
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.delete
+  - description: todo_archive_done（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: archiveDone
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_archive_done
+    input:
+      additionalProperties: false
+      properties:
+        at:
+          maxLength: 24
+          minLength: 24
+          type: string
+      required:
+      - at
+      type: object
+    semantics: evolution
+    state:
+      access: read_write
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.archive_done
+  - description: todo_reset（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: resetBoard
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_reset
+    input:
+      additionalProperties: false
+      properties:
+        at:
+          maxLength: 24
+          minLength: 24
+          type: string
+      required:
+      - at
+      type: object
+    semantics: evolution
+    state:
+      access: read_write
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.reset
+  - description: todo_replace_board（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: replaceBoard
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_replace_board
+    input:
+      additionalProperties: false
+      properties:
+        at:
+          maxLength: 24
+          minLength: 24
+          type: string
+        board:
+          additionalProperties: true
+          type: object
+      required:
+      - board
+      - at
+      type: object
+    semantics: evolution
+    state:
+      access: read_write
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.replace_board
+  - description: Task Boardの正本ドキュメント全体を返す（TODO画面の描画用）（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: boardDocument
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_board
+    input:
+      additionalProperties: false
+      properties: {}
+      type: object
+    semantics: observation
+    state:
+      access: read
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.board
+  - description: Calendar向けの期日投影（task_id, title, due_at, completedのみ）（チームボード team_tasks 経由）
+    effects:
+      external: none
+    execution:
+      export: listDueDates
+      kind: state_transform
+      module: ./src/operations/todo.js
+      use: ato.javascript@1
+    expose:
+      mcp: false
+      webmcp: false
+    id: todo_team_list_due_dates
+    input:
+      additionalProperties: false
+      properties: {}
+      type: object
+    output:
+      additionalProperties: false
+      properties:
+        tasks:
+          items:
+            additionalProperties: false
+            properties:
+              completed:
+                type: boolean
+              due_at:
+                type: string
+              task_id:
+                type: string
+              title:
+                type: string
+            required:
+            - task_id
+            - title
+            - due_at
+            - completed
+            type: object
+          type: array
+      required:
+      - tasks
+      type: object
+    semantics: observation
+    state:
+      access: read
+      kind: data_port
+      port: team_tasks
+      protocol: todo.board@1
+    title: todo.team.listDueDates
 state_write_policy: operations_only

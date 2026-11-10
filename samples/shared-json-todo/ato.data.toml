@@ -1,10 +1,50 @@
-# The board lives in a user-owned DataResource. The Port names the protocol;
-# which Resource it points at is decided at runtime by the person via consent.
-schema = "ato.data-ports/1"
+# The board lives in DataResources. "tasks" is the person's own board (user
+# scope); "team_tasks" is the team board the same Instance may also connect to
+# (instance scope, explicit consent). Both Ports are operation-only Ports: the
+# app invokes the declared operations and never gets whole-document read or
+# replace. Which Resource each Port points at is decided at runtime via consent.
+schema = "ato.data-ports/2"
 
 [[port]]
 name = "tasks"
 protocol = "todo.board@1"
 scope = "user"
-access = "read_write"
+access = "operations"
 required = true
+operations = [
+  "todo_list",
+  "todo_get",
+  "todo_get_by_number",
+  "todo_create",
+  "todo_update",
+  "todo_initialize",
+  "todo_move",
+  "todo_delete",
+  "todo_archive_done",
+  "todo_reset",
+  "todo_replace_board",
+  "todo_board",
+  "todo_list_due_dates",
+]
+
+[[port]]
+name = "team_tasks"
+protocol = "todo.board@1"
+scope = "instance"
+access = "operations"
+required = false
+operations = [
+  "todo_team_list",
+  "todo_team_get",
+  "todo_team_get_by_number",
+  "todo_team_create",
+  "todo_team_update",
+  "todo_team_initialize",
+  "todo_team_move",
+  "todo_team_delete",
+  "todo_team_archive_done",
+  "todo_team_reset",
+  "todo_team_replace_board",
+  "todo_team_board",
+  "todo_team_list_due_dates",
+]

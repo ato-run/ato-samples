@@ -1,126 +1,264 @@
 <!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#f6f7f9" />
-  <meta name="description" content="ato.run向け、クライアントサイドだけで動く同期対応タスク管理ボード" />
-  <title>Task Board</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <main class="app-shell">
-    <div class="topbar">
-      <div class="brand">
-        <h1>Task Board</h1>
-        <p>ドラッグで整理。状態はクライアント側の1つのJSONとして保存され、ato.run側のlocalStorage同期にそのまま載せられます。</p>
-      </div>
-      <div class="sync-pill" title="localStorage + storage event + BroadcastChannel">
-        <span class="sync-dot"></span>
-        <span id="syncLabel">同期準備完了</span>
-      </div>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f6f7f9" />
+    <meta
+      name="description"
+      content="Kanban・Tickets・Roadmapを同じタスクで切り替えるTask Board"
+    />
+    <title>Task Board</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./workspace.css" />
+  </head>
+  <body data-project-operations="false" data-priority-move="false">
+    <div class="app-shell">
+      <aside class="workspace-rail" aria-label="アプリ内ナビゲーション">
+        <button
+          id="railToggle"
+          class="rail-brand"
+          aria-label="ナビゲーションを縮約"
+          aria-expanded="true"
+          aria-controls="workspaceNav"
+        >
+          <span class="nav-symbol" data-icon="panel"></span
+          ><span class="nav-label">Task Board</span>
+        </button>
+        <nav id="workspaceNav" aria-label="ワークスペース">
+          <button
+            id="ticketsNav"
+            aria-label="All Tickets"
+            data-screen="tasks"
+            data-view="tickets"
+          >
+            <span class="nav-symbol" data-icon="tickets"></span
+            ><span class="nav-label">All Tickets</span>
+          </button>
+          <button
+            id="kanbanNav"
+            aria-label="Kanban"
+            data-screen="tasks"
+            data-view="kanban"
+          >
+            <span class="nav-symbol" data-icon="kanban"></span
+            ><span class="nav-label">Kanban</span>
+          </button>
+          <button
+            id="roadmapNav"
+            aria-label="Roadmap"
+            data-screen="tasks"
+            data-view="roadmap"
+          >
+            <span class="nav-symbol" data-icon="roadmap"></span
+            ><span class="nav-label">Roadmap</span>
+          </button>
+          <button id="projectsNav" aria-label="Projects" data-screen="projects">
+            <span class="nav-symbol" data-icon="projects"></span
+            ><span class="nav-label">Projects</span>
+          </button>
+          <button id="archivedNav" aria-label="Archived">
+            <span class="nav-symbol" data-icon="archive"></span
+            ><span class="nav-label">Archived</span>
+          </button>
+        </nav>
+        <div class="rail-footer">
+          <span id="taskResultCount" role="status" aria-live="polite"></span>
+          <div class="sync-pill" role="status" aria-live="polite">
+            <span class="sync-dot"></span
+            ><span id="syncLabel">正本を確認中</span>
+          </div>
+        </div>
+      </aside>
+      <button
+        id="navigationScrim"
+        class="navigation-scrim"
+        aria-label="ナビゲーションを閉じる"
+        hidden
+      ></button>
+      <main class="workspace-content" aria-label="Kanban">
+        <section class="toolbar">
+          <label class="search-field"
+            ><span data-icon="search"></span
+            ><input
+              id="searchInput"
+              class="control search"
+              type="search"
+              placeholder="タスクを検索…"
+              autocomplete="off"
+          /></label>
+          <select
+            id="priorityFilter"
+            class="control"
+            aria-label="優先度で絞り込み"
+          >
+            <option value="">すべての優先度</option>
+            <option value="high">高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
+            <option value="none">優先度なし</option>
+          </select>
+          <select id="dueFilter" class="control" aria-label="期限で絞り込み">
+            <option value="">すべての期限</option>
+            <option value="overdue">期限切れ</option>
+            <option value="today">今日</option>
+            <option value="week">7日以内</option>
+            <option value="none">期限なし</option>
+          </select>
+          <button id="globalAddBtn" class="primary new-task">
+            <span data-icon="plus"></span
+            ><span class="button-label">New ticket</span>
+          </button>
+        </section>
+
+        <div
+          id="kanbanView"
+          class="board-scroll"
+          role="region"
+          aria-labelledby="kanbanNav"
+          tabindex="0"
+        >
+          <section id="board" class="board" aria-label="タスクボード"></section>
+        </div>
+        <section
+          id="ticketsView"
+          role="region"
+          aria-labelledby="ticketsNav"
+          tabindex="0"
+          hidden
+        ></section>
+        <section
+          id="roadmapView"
+          role="region"
+          aria-labelledby="roadmapNav"
+          tabindex="0"
+          hidden
+        ></section>
+        <section id="projectsView" aria-label="Projects" hidden></section>
+      </main>
     </div>
 
-    <section class="toolbar">
-      <input id="searchInput" class="control search" type="search" placeholder="タスクを検索…" autocomplete="off" />
-      <select id="priorityFilter" class="control" aria-label="優先度で絞り込み">
-        <option value="">すべての優先度</option>
-        <option value="high">High</option>
-        <option value="medium">Medium</option>
-        <option value="low">Low</option>
-        <option value="none">優先度なし</option>
-      </select>
-      <select id="dueFilter" class="control" aria-label="期限で絞り込み">
-        <option value="">すべての期限</option>
-        <option value="overdue">期限切れ</option>
-        <option value="today">今日</option>
-        <option value="week">7日以内</option>
-        <option value="none">期限なし</option>
-      </select>
-      <button id="globalAddBtn" class="primary new-task">＋ タスクを追加</button>
-    </section>
+    <div id="modalBackdrop" class="modal-backdrop" role="presentation">
+      <section
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalTitle"
+      >
+        <div class="modal-head">
+          <h2 id="modalTitle">タスク</h2>
+          <button id="closeModalBtn" class="close-btn" aria-label="閉じる">
+            <span data-icon="close"></span>
+          </button>
+        </div>
 
-    <div class="board-scroll">
-      <section id="board" class="board" aria-label="タスクボード"></section>
+        <div class="modal-body">
+          <div class="field">
+            <label for="taskTitleInput">タイトル</label>
+            <input
+              id="taskTitleInput"
+              class="control"
+              maxlength="160"
+              placeholder="例: LPを公開する"
+            />
+          </div>
+
+          <div class="field">
+            <label for="taskDescriptionInput">説明</label>
+            <textarea
+              id="taskDescriptionInput"
+              class="control"
+              maxlength="5000"
+              placeholder="必要な情報をメモ"
+            ></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="field">
+              <label for="taskColumnSelect">ステータス</label>
+              <select id="taskColumnSelect" class="control"></select>
+            </div>
+
+            <div class="field">
+              <label for="taskPrioritySelect">優先度</label>
+              <select id="taskPrioritySelect" class="control">
+                <option value="none">なし</option>
+                <option value="low">低</option>
+                <option value="medium">中</option>
+                <option value="high">高</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="taskDueInput">期限</label>
+              <input id="taskDueInput" class="control" type="date" />
+            </div>
+          </div>
+
+          <label class="check-row">
+            <input id="taskCompletedInput" type="checkbox" />
+            タスクを完了
+          </label>
+
+          <div class="section-title">
+            <h3>
+              サブタスク
+              <span
+                id="subtaskProgressLabel"
+                style="color: var(--muted); font-weight: 650"
+              ></span>
+            </h3>
+          </div>
+
+          <div id="subtaskList" class="subtask-list"></div>
+
+          <div class="add-subtask">
+            <input
+              id="newSubtaskInput"
+              class="control"
+              maxlength="200"
+              placeholder="サブタスクを追加…"
+            />
+            <button id="addSubtaskBtn" class="secondary">追加</button>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="deleteTaskBtn" class="danger" aria-label="タスクを削除">
+            <span data-icon="trash"></span
+            ><span class="button-label">削除</span>
+          </button>
+          <div class="footer-actions">
+            <button id="cancelTaskBtn" class="secondary">キャンセル</button>
+            <button id="saveTaskBtn" class="primary">
+              <span data-icon="check"></span><span>保存</span>
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
-  </main>
 
-  <div id="modalBackdrop" class="modal-backdrop" role="presentation">
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-head">
-        <h2 id="modalTitle">タスク</h2>
-        <button id="closeModalBtn" class="close-btn" aria-label="閉じる">×</button>
-      </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-      <div class="modal-body">
-        <div class="field">
-          <label for="taskTitleInput">タイトル</label>
-          <input id="taskTitleInput" class="control" maxlength="160" placeholder="例: LPを公開する" />
-        </div>
-
-        <div class="field">
-          <label for="taskDescriptionInput">説明</label>
-          <textarea id="taskDescriptionInput" class="control" maxlength="5000" placeholder="必要な情報をメモ"></textarea>
-        </div>
-
-        <div class="form-row">
-          <div class="field">
-            <label for="taskColumnSelect">ステータス</label>
-            <select id="taskColumnSelect" class="control"></select>
-          </div>
-
-          <div class="field">
-            <label for="taskPrioritySelect">優先度</label>
-            <select id="taskPrioritySelect" class="control">
-              <option value="none">None</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="taskDueInput">期限</label>
-            <input id="taskDueInput" class="control" type="date" />
-          </div>
-        </div>
-
-        <label class="check-row">
-          <input id="taskCompletedInput" type="checkbox" />
-          タスクを完了
-        </label>
-
-        <div class="section-title">
-          <h3>サブタスク <span id="subtaskProgressLabel" style="color:var(--muted);font-weight:650"></span></h3>
-        </div>
-
-        <div id="subtaskList" class="subtask-list"></div>
-
-        <div class="add-subtask">
-          <input id="newSubtaskInput" class="control" maxlength="200" placeholder="サブタスクを追加…" />
-          <button id="addSubtaskBtn" class="secondary">追加</button>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button id="deleteTaskBtn" class="danger">削除</button>
-        <div class="footer-actions">
-          <button id="cancelTaskBtn" class="secondary">キャンセル</button>
-          <button id="saveTaskBtn" class="primary">保存</button>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <div id="toast" class="toast"></div>
-
-  <script src="./app-1.js"></script>
-  <script src="./operation-client.js"></script>
-  <script src="./app-2.js"></script>
-  <script src="./app-3.js"></script>
-  <script src="./app-4.js"></script>
-  <script src="./app-5.js"></script>
-  <script src="./app-6.js"></script>
-  <script src="./app-7.js"></script>
-</body>
+    <script src="./icons.js"></script>
+    <script src="./view-state.js"></script>
+    <script src="./app-1.js"></script>
+    <script src="./operation-client.js"></script>
+    <script src="./app-2.js"></script>
+    <script src="./app-3.js"></script>
+    <script src="./app-4.js"></script>
+    <script src="./app-5.js"></script>
+    <script src="./app-6.js"></script>
+    <script src="./app-7.js"></script>
+    <script src="./selectors.js"></script>
+    <script src="./render-tickets.js"></script>
+    <script src="./render-roadmap.js"></script>
+    <script src="./workspace-ui.js"></script>
+    <script src="./kanban-position.js"></script>
+    <script src="./render-planning.js"></script>
+    <script src="./responsive-ui.js"></script>
+  </body>
 </html>

@@ -1,0 +1,7 @@
+schema = "ato.data-ports/1"
+[[port]]
+name = "tasks"
+protocol = "todo.board@2"
+scope = "user"
+access = "read_write"
+required = true

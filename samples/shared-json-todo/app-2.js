@@ -1,4 +1,25 @@
 async function moveTask(taskId, columnId, targetTaskId = null, after = false) {
+  if (window.TaskBoardViewState?.sort === "priority") {
+    if (document.body.dataset.priorityMove !== "true") return;
+    if (!targetTaskId) {
+      const tasks = tasksForColumn(columnId, true).filter(
+        (t) => t.id !== taskId,
+      );
+      targetTaskId = tasks.at(-1)?.id || null;
+      after = true;
+    }
+    await runOperation("todo_move_priority_v1", {
+      id: taskId,
+      column_id: columnId,
+      target_id: targetTaskId || "",
+      after,
+      expected_revision: state.revision,
+      ...(document.body.dataset.projectOperations === "true"
+        ? { expected_version: state.tasks[taskId]?.editVersion || 0 }
+        : {}),
+    });
+    return;
+  }
   await runOperation("todo_move", {
     id: taskId,
     column_id: columnId,
@@ -88,14 +109,19 @@ function openTaskModal(taskId = null, columnId = "todo") {
   dom.description.value = task?.description || "";
   dom.column.value = task?.columnId || columnId;
   dom.priority.value = task?.priority || "none";
-  dom.due.value = task?.dueAt || "";
+  dom.due.value = (task?.dueAt || "").slice(0, 10);
   dom.completed.checked = !!task?.completed;
   draftSubtasks = task ? task.subtasks.map((s) => ({ ...s })) : [];
   dom.deleteTask.style.visibility = task ? "visible" : "hidden";
   dom.newSubtask.value = "";
   renderSubtasks();
   dom.modalBackdrop.classList.add("open");
-  setTimeout(() => dom.title.focus(), 0);
+  if (!task || !matchMedia("(max-width: 767px)").matches) dom.title.focus();
+  else {
+    const dialog = dom.modalBackdrop.querySelector("[role=dialog]");
+    dialog.tabIndex = -1;
+    dialog.focus();
+  }
 }
 
 function closeModal() {
@@ -116,12 +142,12 @@ function renderSubtasks() {
     empty.textContent = "サブタスクはありません";
     dom.subtaskList.appendChild(empty);
   } else {
-    for (const sub of sorted) {
+    for (const [index, sub] of sorted.entries()) {
       const row = document.createElement("div");
       row.className = "subtask-row";
       row.dataset.subtaskId = sub.id;
       row.draggable = true;
-      row.innerHTML = `<input type="checkbox" ${sub.completed ? "checked" : ""} data-sub-check="${escapeAttr(sub.id)}" aria-label="サブタスク完了"><input class="subtask-title-input ${sub.completed ? "done" : ""}" value="${escapeAttr(sub.title)}" data-sub-title="${escapeAttr(sub.id)}" maxlength="200"><button class="drag-handle" data-sub-handle="${escapeAttr(sub.id)}" aria-label="ドラッグして並び替え">⋮⋮</button><button class="mini-btn" data-sub-delete="${escapeAttr(sub.id)}" aria-label="サブタスクを削除">×</button>`;
+      row.innerHTML = `<label class="subtask-check"><input type="checkbox" ${sub.completed ? "checked" : ""} data-sub-check="${escapeAttr(sub.id)}" aria-label="サブタスク ${index + 1} を完了"></label><input aria-label="サブタスク ${index + 1} のタイトル" class="subtask-title-input ${sub.completed ? "done" : ""}" value="${escapeAttr(sub.title)}" data-sub-title="${escapeAttr(sub.id)}" maxlength="200"><button class="drag-handle" data-sub-handle="${escapeAttr(sub.id)}" aria-label="ドラッグして並び替え">${TaskBoardIcons.icon("grip")}</button><button class="mini-btn" data-sub-delete="${escapeAttr(sub.id)}" aria-label="サブタスクを削除">${TaskBoardIcons.icon("close")}</button>`;
       dom.subtaskList.appendChild(row);
     }
   }
@@ -249,6 +275,56 @@ async function saveModalTask() {
       document.getElementById("recurrenceWeekdaySelect").value,
     );
   }
+  if (editingTaskId) {
+    const current = state.tasks[editingTaskId];
+    if (!current) {
+      toast("タスクが削除されています");
+      return;
+    }
+    const fields = {
+      title: "title",
+      description: "description",
+      priority: "priority",
+      column_id: "columnId",
+      completed: "completed",
+    };
+    for (const [argument, field] of Object.entries(fields))
+      if (args[argument] === current[field]) delete args[argument];
+    if (args.due_at === (current.dueAt || "").slice(0, 10)) delete args.due_at;
+    const known = (list) =>
+      list.map((sub, i) => ({
+        id: sub.id,
+        title: sub.title,
+        completed: sub.completed,
+        order: (i + 1) * ORDER_STEP,
+      }));
+    if (
+      JSON.stringify(known(args.subtasks)) ===
+      JSON.stringify(known(current.subtasks))
+    )
+      delete args.subtasks;
+    else if (
+      document.body.dataset.projectOperations !== "true" &&
+      current.subtasks.some((sub) =>
+        Object.keys(sub).some(
+          (key) => !["id", "title", "completed", "order"].includes(key),
+        ),
+      )
+    ) {
+      toast(
+        "追加フィールドを持つサブタスクの編集には新しいデータ契約が必要です",
+      );
+      return;
+    }
+  }
+  if (args.subtasks)
+    args.subtasks = args.subtasks.map((sub) => ({
+      id: sub.id,
+      title: sub.title,
+      completed: sub.completed,
+      order: sub.order,
+    }));
+  window.TaskBoardUI?.taskArguments(args);
   await runOperation(
     editingTaskId ? "todo_update" : "todo_create",
     args,

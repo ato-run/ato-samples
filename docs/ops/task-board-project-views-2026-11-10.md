@@ -1,0 +1,74 @@
+# Task Board sample parity — 2026-11-10
+
+Branch `feat/task-board-project-views`, exact base
+`bf0759cf8f5d2af29929f66e803bb8975ce0f6be`, stacked on
+[samples #8](https://github.com/ato-run/ato-samples/pull/8).
+UI-only commit: `6553463`. No deployment or production adoption.
+
+The common UI plus `profiles/projects-v2` files (21 files) match the API feature
+branch byte for byte. v2 wrapper SHA-256:
+`5feb27f881af4a656cb6dc15295797b3e8c084ee819cf5f1e8cb924a129b55b6`.
+The existing sample v1 handler, operation declaration and data port remain
+byte-identical to this base. The sample's pre-existing due-date projection is
+retained; copying the API UI does not replace that immutable v1 closure.
+
+Both `current` and `projects-v2` standalone packages build with the standard Node
+scripts. JavaScript syntax and `git diff --check` pass. The API checkout verifies
+the common UI and identical v2 closure using 35 unit/contract tests and the real
+local Operation Bridge / D1 / Wasm / Chromium acceptance, including 24 layout/theme
+captures. That is local acceptance; no deployed sample or v2 Calendar reconsent
+is claimed.
+
+Full evidence and release boundaries:
+[API worklog](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-project-views-2026-11-10.md)
+and [draft contract](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/rfcs/draft/task-board-project-views.md).
+A comprehensive writer fence/coordinator must be implemented and reviewed before
+live migration; registry verification, explicit approval and Calendar consent
+remain separate gates. `todo.board@2` is only a local candidate name.
+
+
+Follow-up: view navigation, selected-view indication, task count and sync status
+now live only in the sidebar. Duplicate main page titles and view tabs were removed
+at the user's request. The common UI startup sync label is fixed. The 21 common
+UI/Project files still match the API branch. Production UI adoption uses an API-only
+legacy compatibility profile and is recorded in its separate production worklog;
+this sample remains the DataResource profile and is not adopted automatically.
+
+The strict design/mobile follow-up adds shared SVG icons, 44px mobile actions,
+responsive Tickets rows, a functioning narrow sidebar overlay, bounded options
+menus, a viewport-aware detail sheet and edge scrolling during touch drag.
+The 23 common UI/Project files match the API branch; sample v1 handler/catalog/data
+port remain unchanged. Both standalone profiles build, JavaScript syntax and diff
+checks pass. Production UI adoption uses the API-only browser compatibility
+profile, not this sample. See the
+[review and final production Schema](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-mobile-design-2026-11-10.md).
+
+Kanban scrolling follow-up: horizontal mobile navigation snaps between columns;
+each labelled Task list scrolls vertically beneath its fixed header. Presentation
+offsets survive rendering, and DnD edge scrolling uses the hovered list. The four
+updated UI files match the API branch, with the same 23-file common parity. Both
+sample packages build; immutable contracts remain unchanged. The API's complete
+local Operation Bridge suite, including actual touch/keyboard/wheel scrolling,
+passes. See the [scroll/adoption record](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-kanban-scroll-2026-11-10.md).
+
+The mobile polish adds a swipe-linked four-column indicator with click/keyboard
+selection, centers icon controls and removes healthy count/sync details from the
+collapsed rail. Recovery actions remain available. All 24 common UI/Project files
+match the API branch; both sample packages build and frozen contracts are unchanged.
+The complete API browser suite, six added mobile/theme captures and centering/44px
+geometry checks passed. See the [design review and adoption](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-kanban-position-2026-11-10.md).
+
+Tickets/Roadmap follow-up: consistent mobile spacing, priority names, 16px icons,
+two-line titles and bounded timeline controls. Kanban/Tickets default to priority
+order; Tickets defaults to no grouping. The new private versioned priority-move
+Operation is enabled only in the unregistered Project candidate (and the API-only
+production browser profile). The sealed v1 handler/catalog/port stay unchanged;
+current-profile priority drag remains disabled and manual drag remains available.
+The 26 shared UI/core/Project targets are present. After integrating upstream
+sample PRs #14–16 (`f54bd63`), 24 match the API byte-for-byte; operation-client.js
+and workspace-ui.js retain the sample-only Personal/Team/All behavior. Both packages build;
+24 isolated operation tests, full browser acceptance and 12 mobile list captures
+pass. The original personal handler and adopted upstream port/declarations are
+retained. All remains read-only, including drag affordances. The upstream
+Coordinator-specific team test was retained but not rerun in this follow-up.
+See the [atomic move, review and latest adoption record](https://github.com/ato-run/ato-api/blob/feat/task-board-project-views/docs/ops/task-board-mobile-lists-priority-2026-11-10.md).

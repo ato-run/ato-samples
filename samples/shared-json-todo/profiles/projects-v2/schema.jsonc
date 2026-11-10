@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task Board Project document candidate",
+  "type": "object",
+  "required": ["schemaVersion", "columns", "tasks", "projects"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "const": 4 },
+    "revision": {
+      "type": "integer",
+      "description": "Application counter; never the Resource CAS revision",
+    },
+    "columns": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true },
+    },
+    "projects": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/project" },
+    },
+    "tasks": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/task" },
+    },
+    "recurrences": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+      },
+    },
+    "recurrenceOccurrences": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+    },
+  },
+  "$defs": {
+    "date": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "project": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "name", "order"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 5000 },
+        "startDate": { "$ref": "#/$defs/date" },
+        "targetDate": { "$ref": "#/$defs/date" },
+        "color": { "type": "string" },
+        "order": { "type": "number" },
+        "editVersion": { "type": "integer", "minimum": 0 },
+      },
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "title", "columnId", "completed", "order", "subtasks"],
+      "properties": {
+        "id": { "type": "string" },
+        "number": { "type": ["integer", "null"] },
+        "columnId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "enum": ["none", "low", "medium", "high"] },
+        "dueAt": { "type": ["string", "null"] },
+        "completed": { "type": "boolean" },
+        "archived": { "type": "boolean" },
+        "order": { "type": "number" },
+        "projectId": { "type": ["string", "null"] },
+        "editVersion": { "type": "integer", "minimum": 0 },
+        "subtasks": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true },
+        },
+        "recurrenceId": { "type": ["string", "null"] },
+        "occurrenceDate": { "type": ["string", "null"] },
+        "createdAt": { "type": ["string", "null"] },
+        "updatedAt": { "type": ["string", "null"] },
+      },
+    },
+  },
+}
