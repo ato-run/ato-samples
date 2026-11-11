@@ -12,7 +12,7 @@ The v0.9.1 quick-start bundle contains three capsules and a digest-pinned
 | Pane | Sample | What it shows |
 | --- | --- | --- |
 | `todo` | `samples/shared-json-todo` | a task board whose state is a DataResource document |
-| `calendar` | `samples/shared-json-calendar` | a separate app that reads **only** the declared `todo_list_due_dates` projection |
+| `calendar` | `samples/shared-json-calendar` | vendored FullCalendar 7.1.4 month/list view that reads **only** the declared `todo_list_due_dates` projection |
 | `excalidraw` | `samples/excalidraw` | a whiteboard whose scene is a declared state/export operation surface |
 
 Supported CLI: **`ato` 0.9.1**. No `npm` or Rust build is needed to try it.
@@ -45,9 +45,11 @@ Supported CLI: **`ato` 0.9.1**. No `npm` or Rust build is needed to try it.
 
 The data (both DataResource documents and the whiteboard scene) and the split
 layout come back; a pane that cannot be restored fails the resume instead of
-starting empty. Cross-host continuation and the honest limits are described in
+starting empty. The Excalidraw pane saves its scene through its own **Save
+checkpoint** button; the shell **Checkpoint** then captures it together with the
+other panes and the layout. Cross-host continuation and the honest limits are described in
 the [ato quick start guide](https://github.com/ato-run/ato/blob/main/docs/guides/quick-start-first-workspace.md)
-and the [74-second demo](https://ato-run.github.io/ato-samples/media/ato-quick-start-demo-v0.9.1.mp4)
+and the [76-second demo](https://ato-run.github.io/ato-samples/media/ato-quick-start-demo-v0.9.1.mp4)
 (no audio, English captions).
 
 ### Building the bundle
