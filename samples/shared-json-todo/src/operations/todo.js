@@ -698,9 +698,11 @@ export function initializeBoard({ arguments: args, state }) {
     board.recurrenceOccurrences[key] = id;
     count++;
   }
-  return changed || count
-    ? commit(board, { count }, at)
-    : { operations: [], result: { count: 0 } };
+  // The operation-scoped adapter requires exactly one `replace` per mutating
+  // operation; a no-op must still commit the (unchanged) board, otherwise a
+  // repeated materialize (e.g. after resuming a workspace) fails with
+  // handler_failed instead of reporting success.
+  return commit(board, { count }, at);
 }
 export function moveTodo({ arguments: args, state }) {
   const at = timestamp(args.at),
