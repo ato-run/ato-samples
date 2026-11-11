@@ -35,6 +35,23 @@ reads the document inside the trusted handler and returns just
 `task_id`, `title`, `due_at`, `completed` for tasks that have a due date.
 Descriptions, subtasks, columns and recurrences never leave the handler.
 
+The second projection is **`todo_list_shared`**: the owner marks a task as
+shared with `todo_set_shared`, and this operation returns only those tasks,
+limited to `task_id`, `number`, `title`, `status` and `due_at`.
+
+## Team sharing (selected tasks only)
+
+A task carries a `shared` flag that the owner toggles with `todo_set_shared`.
+`todo_list_shared` returns only the shared tasks, and only
+`task_id`, `number`, `title`, `status` and `due_at`. Everything else
+(description, subtasks, comments, private tasks) never crosses the Port.
+
+Sharing is a Grant to one instance, not a property of the data: the owner
+connects the member's Task Board with an operations-only Port that lists
+`todo_list_shared`. That instance cannot read the document, cannot invoke
+another operation, and loses the shared view the moment the owner unshares —
+the board, its tasks and its revision stay.
+
 ## What is shared, and what is not
 
 - The Resource document is the authoritative board. There is no local copy to

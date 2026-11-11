@@ -505,4 +505,81 @@ operations:
       access: read
     effects: {external: none}
     expose: {mcp: false, webmcp: false}
+  - id: todo_list_shared
+    title: todo.listShared
+    description: "チーム共有向けの投影。owner が shared にした TODO だけを task_id, number, title, status, due_at に限定して返す"
+    semantics: observation
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    output:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              task_id: {type: string}
+              number: {type: [integer, "null"]}
+              title: {type: string}
+              status: {type: string}
+              due_at: {type: [string, "null"]}
+            required: [task_id, number, title, status, due_at]
+            additionalProperties: false
+      required: [tasks]
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: listSharedTasks
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@1
+      access: read
+    effects: {external: none}
+    expose: {mcp: true, webmcp: false}
+  - id: todo_set_shared
+    title: todo.setShared
+    description: "TODO のチーム共有可否を切り替える。shared=true の TODO だけが todo_list_shared に現れる"
+    semantics: evolution
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        shared:
+          type: boolean
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required: [id, shared, at]
+      additionalProperties: false
+    output:
+      type: object
+      properties:
+        task_id: {type: string}
+        shared: {type: boolean}
+        revision: {type: integer}
+        updated_at: {type: string}
+      required: [task_id, shared, revision, updated_at]
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: setTaskSharing
+    state:
+      kind: data_port
+      port: tasks
+      protocol: todo.board@1
+      access: read_write
+    effects: {external: none}
+    expose: {mcp: false, webmcp: false}
 state_write_policy: operations_only
