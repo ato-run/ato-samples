@@ -123,7 +123,7 @@ merged 2026-11-10）が定める `ato.data-ports/2` + `access = "operations"` �
 | 3 | `cd samples && npm ci --ignore-scripts && npm run validate` | **PASS**（12 サンプル）。ただし `samples/tools/validate-health.mjs` は tier 配下の `health.toml` のみ対象で、`shared-json-todo` は**この CI の対象外**（repo README の「CI は不完全」記述どおり） |
 | 4 | `node --check`（`todo.js` を `.mjs` として、および `app-*.js` / `operation-client.js`） | **PASS**（構文） |
 | 5 | `ato validate samples/shared-json-todo` | **BLOCKED**: 手元 CLI は `ato 0.5.5`。`capsule.toml` の `schema = "ato.capsule/2"` を解釈できず `E001 manifest_toml_parse: missing field \`name\``（exit 1）。`capsule.toml` は #10 で未変更（dev と同一）なので既存の環境制約 |
-| 6 | ato `services/coordinator/e2e/team-sharing.mjs`（real SQLite Coordinator） | **NOT EXECUTED**: coordinator のビルド/起動が必要で、この作業範囲（ato-samples のみ）外。#10 本文のログは rebase 前の実行記録 |
+| 6 | ato `services/coordinator/e2e/team-sharing.mjs`（real SQLite Coordinator） | **NOT EXECUTED（この作業では未実行）**: coordinator のビルド/起動が必要で、この作業範囲（ato-samples のみ）外。#10 本文のログは rebase 前の実行記録。**この 2 operation の real-Coordinator E2E は task-3（ato local coordinator）が担当してカバーする**。ato-samples の stg は `todo_list_shared`/`todo_set_shared` の宣言を運ぶが、その実行時挙動はここでは検証していない |
 | 7 | `gh pr view 10`（差分の形） | **PASS**: `changedFiles=3, additions=126, deletions=0` |
 | 8 | CI `sample inputs`（`.github/workflows/verify.yml`, job `static-inputs`）on `b6028a9` | **PASS**: pull_request run `43028160920` success / workflow_dispatch run `43027945754` success。force-push 直後は旧 base（`feat/g1-shared-json-contract`）との merge ref が作れず pull_request run が生成されなかったため、base を dev に変更した後に reopened で同 SHA の pull_request run を実行した。billing 由来の失敗ではない |
 | 9 | CI `sample inputs` on `0e5d734`（#48 の head） | **PASS**: pull_request run `43028373616` success（mergeable=CLEAN でマージ） |
@@ -144,7 +144,11 @@ merged 2026-11-10）が定める `ato.data-ports/2` + `access = "operations"` �
   よって「pin を追加する」作業は不要。
 - 今回の昇格: #48（`dev` `0e5d734` → `stg`）を CI green + mergeable CLEAN で merge commit マージし、
   `origin/stg` = `fc014b9ade2ac7e30b2c4b20a234f5f5017c8675`。`origin/main` は変更していない
-  （stg→main はリリース承認の別操作）。
+  （stg→main はリリース承認の別操作）。#49（この記録）のマージで dev が進むため、
+  `stg ⊇ dev` を保つ昇格 PR をもう一度切る（§8）。
+- ブランチ運用の差分（慣行として記録、変更しない）: workspace の指示は「マージ後に feature branch を
+  削除」だが、この repo の実際の運用は merged branch を残している（#11/#12/#13 の head も残存）。
+  そのため #8（`bf0759c`）と #10（`b6028a9`）の branch は削除しない。
 
 ## 6.1 #8 の扱い（実施記録）
 
@@ -168,5 +172,9 @@ merged 2026-11-10）が定める `ato.data-ports/2` + `access = "operations"` �
   `app-*.js` / `ato.operations.yaml` に載せ替える別タスク。
 - `ato-api` 参照 fixture と ato-samples calendar の `scope` 不一致（§4 Detected mismatch）の扱い。
 - 共有トグルの UI（#10 は operation と handler のみ。`app-*.js` は未変更）。
-- この記録自体は PR #49（head `docs/datare-samples-integration-20261111`, base `dev`, +163 / 1 file）で
-  CI `static-inputs` green・mergeable CLEAN を確認済み。マージは別途の承認で行う（#48 の昇格には含まれない）。
+- この記録は PR #49（head `docs/datare-samples-integration-20261111`, base `dev`）で CI `static-inputs`
+  green・mergeable CLEAN を確認してレビュー承認を得て merge commit で dev へ入れる。
+  #48 の昇格（`fc014b9`）には含まれないため、その後に dev→stg 昇格 PR をもう一度切って
+  `stg ⊇ dev` を保つ。
+- `todo_list_shared` / `todo_set_shared` の real-Coordinator E2E は task-3（ato local coordinator）が
+  担当する。この作業では実行していない（§5 #6）。
