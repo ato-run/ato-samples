@@ -4,25 +4,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Calendar</title>
+    <link rel="stylesheet" href="vendor/fullcalendar/fullcalendar.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app">
       <header class="head">
         <h1>Calendar</h1>
-        <p class="where" id="where" role="status">Opening your data…</p>
+        <p class="where" id="where" role="status">
+          Reading the shared due dates. This app keeps no copy of the board.
+        </p>
       </header>
 
       <p class="problem" id="problem" role="alert" hidden></p>
-      <p class="problem" id="unsupported" role="status" hidden>
-        This data is not in a format this app understands, so there is nothing
-        to show. It is still stored, unchanged.
-      </p>
-
-      <ol class="days" id="days"></ol>
       <p class="empty" id="empty" hidden>No task has a due date yet.</p>
-      <p class="undated" id="undated" hidden></p>
+
+      <div class="calendar" id="calendar"></div>
     </main>
+
+    <script src="vendor/fullcalendar/fullcalendar.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
