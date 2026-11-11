@@ -4,6 +4,21 @@ import { Excalidraw } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 
 const EMPTY_SCENE = { elements: [], appState: {}, files: {} };
+
+/** TOML checkpoints cannot represent null, and Excalidraw emits null for unset
+ *  fields; drop them so the DataResource document stays checkpoint-safe. */
+function withoutNulls(value) {
+  if (Array.isArray(value)) return value.map(withoutNulls).filter((v) => v !== null);
+  if (value && typeof value === "object") {
+    const next = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (item === null || item === undefined) continue;
+      next[key] = withoutNulls(item);
+    }
+    return next;
+  }
+  return value;
+}
 const PROBLEM_NOT_CONNECTED =
   "This scene is not connected to any data yet. Connect data from its app page, then reload.";
 
@@ -61,7 +76,7 @@ function App() {
     try {
       const result = await operations.invoke(
         "scene_save",
-        { scene: sceneRef.current },
+        { scene: withoutNulls(sceneRef.current) },
         crypto.randomUUID(),
       );
       setStatus(`Saved ${result?.result?.element_count ?? sceneRef.current.elements.length} elements.`);
