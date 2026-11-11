@@ -146,6 +146,14 @@ merged 2026-11-10）が定める `ato.data-ports/2` + `access = "operations"` �
   `origin/stg` = `fc014b9ade2ac7e30b2c4b20a234f5f5017c8675`。`origin/main` は変更していない
   （stg→main はリリース承認の別操作）。
 
+## 6.1 #8 の扱い（実施記録）
+
+- `#8` は **2026-11-11T13:23:45Z に superseded として close**（却下ではない）。close 前に、
+  §3.1 の一致（13 operation / 13 export / 同一 `ato.data.toml`）と rebase 後に残る 3 差分
+  （calendar の `scope` 退行、`schema.jsonc` 削除、legacy fixture 2 件の削除）を本文コメントに残した。
+- branch `feat/g1-shared-json-contract` は **削除していない**（remote に `bf0759c` が残存）。
+- 参考: #8 は dev が先に進んだため close 時点で `mergeable=CONFLICTING`。
+
 ## 7. 実行しなかったこと
 
 - #8 の rebase（残る差分が退行と削除のみのため実施しない。branch は削除しない）。
@@ -160,4 +168,5 @@ merged 2026-11-10）が定める `ato.data-ports/2` + `access = "operations"` �
   `app-*.js` / `ato.operations.yaml` に載せ替える別タスク。
 - `ato-api` 参照 fixture と ato-samples calendar の `scope` 不一致（§4 Detected mismatch）の扱い。
 - 共有トグルの UI（#10 は operation と handler のみ。`app-*.js` は未変更）。
-- この記録は CI green を確認して dev へ入れる（別 PR）。
+- この記録自体は PR #49（head `docs/datare-samples-integration-20261111`, base `dev`, +163 / 1 file）で
+  CI `static-inputs` green・mergeable CLEAN を確認済み。マージは別途の承認で行う（#48 の昇格には含まれない）。
