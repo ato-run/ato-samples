@@ -221,7 +221,10 @@
   });
 
   const materialize = () =>
-    runOperation("todo_initialize", { date: localDateString(new Date()) });
+    runOperation("todo_initialize", {
+      at: new Date().toISOString(),
+      date: localDateString(new Date()),
+    });
   let lastCheckedDate = localDateString(new Date());
   setTimeout(materialize, 0);
   setInterval(() => {
