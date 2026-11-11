@@ -2,7 +2,7 @@
 
 Working samples for the Ato CLI, plus historical fixtures kept for reference.
 
-[![Three-app workspace: task board, calendar and whiteboard](assets/quick-start/demo-poster.png)](https://github.com/ato-run/ato-samples/releases/download/v0.9.1/ato-quick-start-demo-v0.9.1.mp4)
+[![Three-app workspace: task board, calendar and whiteboard](assets/quick-start/demo-poster.png)](https://ato-run.github.io/ato-samples/media/ato-quick-start-demo-v0.9.1.mp4)
 
 ## Quick start: the three-app workspace
 
@@ -47,7 +47,7 @@ The data (both DataResource documents and the whiteboard scene) and the split
 layout come back; a pane that cannot be restored fails the resume instead of
 starting empty. Cross-host continuation and the honest limits are described in
 the [ato quick start guide](https://github.com/ato-run/ato/blob/main/docs/guides/quick-start-first-workspace.md)
-and the [74-second demo](https://github.com/ato-run/ato-samples/releases/download/v0.9.1/ato-quick-start-demo-v0.9.1.mp4)
+and the [74-second demo](https://ato-run.github.io/ato-samples/media/ato-quick-start-demo-v0.9.1.mp4)
 (no audio, English captions).
 
 ### Building the bundle
