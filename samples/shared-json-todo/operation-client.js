@@ -9,6 +9,16 @@ let operationBusy = false;
 function boardFailureLabel(code) {
   return "正本を取得できません: " + String(code || "board_unavailable");
 }
+// "unbound" is a first run, not a failure: the in-app chooser takes over and
+// the legacy local board stays usable. Every other failure is an error state.
+function boardFailureStatus(code) {
+  const core = window.AtoTodoResourceCore;
+  if (core && typeof core.failureStatus === "function")
+    return core.failureStatus(code);
+  return code === "data_port_not_connected" || code === "data_resource_unavailable"
+    ? "unbound"
+    : "error";
+}
 async function refreshBoard() {
   try {
     const handle = await atoInstanceOperations.prepare(
@@ -20,22 +30,30 @@ async function refreshBoard() {
     if (result && result.result && typeof result.result === "object") {
       window.__atoBoardDocument = result.result;
       delete window.__atoBoardError;
+      window.__atoBoardStatus = "bound";
       return true;
     }
     window.__atoBoardError = "board_unavailable";
+    window.__atoBoardStatus = "error";
   } catch (error) {
     const code = error && error.code;
     if (code === "data_port_not_connected" || code === "data_resource_unavailable") {
       // Not connected: the legacy local state is the only available view.
       delete window.__atoBoardError;
+      window.__atoBoardStatus = boardFailureStatus(code);
       return false;
     }
     window.__atoBoardError = code || "board_unavailable";
+    window.__atoBoardStatus = boardFailureStatus(window.__atoBoardError);
   }
   window.__atoBoardDocument = undefined;
   state = loadState();
   render();
-  showSync(boardFailureLabel(window.__atoBoardError));
+  showSync(
+    window.__atoBoardStatus === "unbound"
+      ? "ボード未選択"
+      : boardFailureLabel(window.__atoBoardError),
+  );
   return false;
 }
 const operationRetry = document.createElement("button");
@@ -50,6 +68,12 @@ operationRetry.onclick = () =>
 async function runOperation(id, args, onSuccess) {
   if (operationBusy) {
     toast("保存中です");
+    return null;
+  }
+  // A board this person may only read is a real state (a team board shared
+  // read-only): refuse locally instead of letting the server reject every edit.
+  if (window.__atoBoardReadOnly === true) {
+    toast("このボードは読み取り専用です");
     return null;
   }
   const signature = JSON.stringify([id, args]);
