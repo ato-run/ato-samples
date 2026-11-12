@@ -10,6 +10,7 @@ window.TaskBoardViewState = {
   status: "",
   project: "",
   sort: "priority",
+  portFilter: "",
   group: "none",
   description: false,
   zoom: "month",

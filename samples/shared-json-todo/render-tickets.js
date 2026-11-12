@@ -53,7 +53,17 @@ window.renderTickets = function () {
                 escapeAttr(task.id) +
                 '"><td role="cell" class="ticket-number">' +
                 escapeHtml(formatTaskNumber(task.number)) +
-                '</td><td role="cell" class="ticket-title-cell"><button type="button" class="ticket-title" data-open-task="' +
+                '</td><td role="cell" class="ticket-title-cell">' +
+                (task.__port
+                  ? '<span class="ticket-port">' +
+                    escapeHtml(
+                      { tasks: "個人", shared_tasks: "共有", team_tasks: "チーム" }[
+                        task.__port
+                      ] || task.__port,
+                    ) +
+                    "</span>"
+                  : "") +
+                '<button type="button" class="ticket-title" data-open-task="' +
                 escapeAttr(task.id) +
                 '"' +
                 disabled +

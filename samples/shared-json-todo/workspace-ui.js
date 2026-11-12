@@ -38,13 +38,21 @@
   const boardContext = document.createElement("label");
   boardContext.className = "board-context";
   boardContext.innerHTML =
-    '<span>Board</span><select id="boardSelect"><option value="tasks">Personal</option><option value="team_tasks">Ato Team</option><option value="all">All</option></select>';
+    '<span>表示対象</span><select id="boardSelect"><option value="all">すべて（個人＋共有）</option><option value="tasks">個人</option><option value="shared_tasks">共有</option><option value="team_tasks">チーム</option></select>';
   controls.prepend(boardContext);
   const boardSelect = boardContext.querySelector("#boardSelect");
   try {
     boardSelect.value = window.localStorage.getItem("ato.board.port") || "tasks";
   } catch {
-    boardSelect.value = "tasks";
+    boardSelect.value = "all";
+  }
+  // The stored preference and the effective Port can disagree (for example
+  // when the merged default kicks in), so show what is actually read.
+  try {
+    boardSelect.value =
+      typeof boardPort === "function" ? boardPort() : boardSelect.value;
+  } catch {
+    /* keep the option already selected */
   }
   // The hosted App host does not inject window.atoDataPorts; it serves the same
   // answer at /__ato/data-ports. The selfhost bridge keeps its injected call.
@@ -86,6 +94,119 @@
     window.__atoBoardSetPort?.(boardSelect.value);
     setView(ui.view, ui.screen);
   });
+  // The platform's Data Port bridge already offers candidate Resources scoped
+  // to this Port and a first-party connect. The App never sees the account's
+  // full Resource list. Grants to other people stay on the first-party surface.
+  const sharedConnect = document.createElement("button");
+  sharedConnect.type = "button";
+  sharedConnect.className = "secondary rail-shared-connect";
+  sharedConnect.textContent = "共有タスクを追加";
+  sharedConnect.hidden = true;
+  document.querySelector(".workspace-rail nav")?.before(sharedConnect);
+  const sharedPicker = document.createElement("div");
+  sharedPicker.className = "shared-picker";
+  sharedPicker.hidden = true;
+  sharedConnect.after(sharedPicker);
+  const refreshSharedConnect = () =>
+    loadRequirements()
+      .then((requirements) => {
+        const list = Array.isArray(requirements?.bindings)
+          ? requirements.bindings
+          : Array.isArray(requirements?.requirements)
+            ? requirements.requirements
+            : [];
+        const shared = list.find((entry) => entry.port_name === "shared_tasks");
+        sharedConnect.hidden = !(shared && !shared.binding);
+      })
+      .catch(() => {
+        sharedConnect.hidden = true;
+      });
+  async function connectSharedPort(resourceId, expectedEpoch) {
+    const response = await fetch("/__ato/data-ports/shared_tasks/connect", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        resource_id: resourceId,
+        expected_epoch: expectedEpoch,
+        access: "write",
+      }),
+    });
+    if (!response.ok) throw new Error("connect_failed");
+    location.reload();
+  }
+  async function candidates() {
+    const response = await fetch(
+      "/__ato/data-ports/shared_tasks/candidates?access=write",
+      { credentials: "same-origin" },
+    );
+    return response.ok ? response.json() : null;
+  }
+  sharedConnect.addEventListener("click", async () => {
+    if (!sharedPicker.hidden) {
+      sharedPicker.hidden = true;
+      return;
+    }
+    sharedPicker.hidden = false;
+    sharedPicker.textContent = "読み込み中…";
+    const page = await candidates().catch(() => null);
+    if (!page) {
+      sharedPicker.textContent = "共有候補を取得できません。";
+      return;
+    }
+    sharedPicker.textContent = "";
+    for (const resource of page.resources || []) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = resource.display_name || "名前のないデータ";
+      button.addEventListener("click", () =>
+        connectSharedPort(resource.resource_id, resource.access_epoch).catch(
+          () => {
+            sharedPicker.textContent = "接続できませんでした。";
+          },
+        ),
+      );
+      sharedPicker.append(button);
+    }
+    const create = document.createElement("button");
+    create.type = "button";
+    create.className = "secondary";
+    create.textContent = "新しい共有ボードを作成";
+    create.addEventListener("click", async () => {
+      create.disabled = true;
+      try {
+        const created = await fetch("/__ato/data-resources", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            display_name: "共有タスク",
+            document: freshState(),
+          }),
+        });
+        if (!created.ok) throw new Error("create_failed");
+        const { resource_id: resourceId } = await created.json();
+        const next = await candidates();
+        const resource = next?.resources?.find(
+          (entry) => entry.resource_id === resourceId,
+        );
+        if (!resource) throw new Error("candidate_missing");
+        await connectSharedPort(resource.resource_id, resource.access_epoch);
+      } catch {
+        create.disabled = false;
+        sharedPicker.textContent = "共有ボードを作成できませんでした。";
+      }
+    });
+    sharedPicker.append(create);
+  });
+  refreshSharedConnect();
+  const portFilterLabel = document.createElement("label");
+  portFilterLabel.innerHTML =
+    '<span>表示</span><select id="portFilter"><option value="">すべて</option><option value="tasks">個人</option><option value="shared_tasks">共有</option><option value="team_tasks">チーム</option></select>';
+  controls.querySelector(".view-presentation").append(portFilterLabel);
+  const portFilter = controls.querySelector("#portFilter");
+  portFilter.value = ui.portFilter || "";
+  portFilter.setAttribute("aria-label", "個人・共有の絞り込み");
   controls.querySelector("#sortSelect").value = ui.sort;
   controls.querySelector("#groupSelect").value = ui.group;
   const dragHelp = document.createElement("p");
@@ -112,6 +233,16 @@
   notice.className = "board-availability";
   notice.setAttribute("role", "status");
   controls.after(notice);
+  const targetField = document.createElement("div");
+  targetField.className = "field";
+  targetField.innerHTML =
+    '<label for="taskTargetSelect">保存先</label><select id="taskTargetSelect" class="control"><option value="tasks">個人</option><option value="shared_tasks">共有</option><option value="team_tasks">チーム</option></select>';
+  document.querySelector(".modal-body").append(targetField);
+  const targetSelect = targetField.querySelector("#taskTargetSelect");
+  targetSelect.value = boardSelect.value === "all" ? "tasks" : boardSelect.value;
+  targetSelect.addEventListener("change", () => {
+    window.__atoBoardWritePort = targetSelect.value;
+  });
   const projectField = document.createElement("div");
   projectField.className = "field";
   projectField.innerHTML =
@@ -350,7 +481,19 @@
   renderTaskCard = function (task) {
     const card = baseCard(task);
     const meta = card.querySelector(".task-meta");
-    if (meta) meta.innerHTML = selectors.meta(task);
+    if (meta) {
+      meta.innerHTML = selectors.meta(task);
+      meta.querySelector(".task-status")?.remove();
+      if (task.__port) {
+        const badge = document.createElement("span");
+        badge.className = "task-port";
+        badge.textContent =
+          { tasks: "個人", shared_tasks: "共有", team_tasks: "チーム" }[
+            task.__port
+          ] || task.__port;
+        meta.prepend(badge);
+      }
+    }
     if (ui.description && task.description) {
       const text = document.createElement("p");
       text.className = "card-description";
@@ -364,6 +507,7 @@
       statusFilter: "status",
       groupSelect: "group",
       sortSelect: "sort",
+      portFilter: "portFilter",
     };
     if (map[event.target.id]) ui[map[event.target.id]] = event.target.value;
     if (event.target.id === "descriptionDisplay")

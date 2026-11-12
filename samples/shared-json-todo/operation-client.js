@@ -1,6 +1,6 @@
 "use strict";
 // Resource authority only: observations render; prepared Operations commit.
-const DEFAULT_BOARD_PORT = "tasks";
+const DEFAULT_BOARD_PORT = "all";
 let pendingOperation = null;
 let operationBusy = false;
 let boardReadSequence = 0;
@@ -23,19 +23,34 @@ function boardPort() {
     return window.__atoBoardPort || DEFAULT_BOARD_PORT;
   }
 }
-/** The team Port has its own operation set in the manifest (state.port). */
+const PORT_PREFIXES = { tasks: "tasks", shared_tasks: "shared_tasks", team_tasks: "team_tasks" };
+const PORT_LABELS = { tasks: "個人", shared_tasks: "共有", team_tasks: "チーム" };
+/** Task ids in the merged view carry their Resource's Port. */
+function portForTaskId(id) {
+  const value = typeof id === "string" ? id : "";
+  for (const port of Object.keys(PORT_PREFIXES))
+    if (value.startsWith(port + ":")) return port;
+  return null;
+}
+function localTaskId(id) {
+  const port = portForTaskId(id);
+  return port ? id.slice(port.length + 1) : id;
+}
+/** Each Port has its own operation set in the manifest (state.port). */
 function operationForPort(port, operation) {
-  if (
-    port === "team_tasks" &&
-    operation.startsWith("todo_") &&
-    !operation.startsWith("todo_team_")
-  )
-    return "todo_team_" + operation.slice("todo_".length);
+  const prefix =
+    port === "shared_tasks"
+      ? "todo_shared_"
+      : port === "team_tasks"
+        ? "todo_team_"
+        : null;
+  if (prefix && operation.startsWith("todo_") && !operation.startsWith(prefix))
+    return prefix + operation.slice("todo_".length);
   return operation;
 }
-/** Address the selected Port explicitly; fall back to the served instance Port. */
-function prepareOnPort(operation, args, key) {
-  const port = boardPort();
+/** Address a Port explicitly; fall back to the served instance Port. */
+function prepareOnPort(operation, args, key, portOverride) {
+  const port = portOverride || boardPort();
   const scoped = operationForPort(port, operation);
   if (window.atoDataPorts?.request)
     return window.atoDataPorts.request(port, scoped, args, key);
@@ -94,7 +109,7 @@ async function loadBoardRaw(port) {
       ? () =>
           window.atoDataPorts.invoke(port, operationForPort(port, "todo_board"), {}, key)
       : async () => {
-          const handle = await prepareOnPort("todo_board", {}, key);
+          const handle = await prepareOnPort("todo_board", {}, key, port);
           try {
             return await handle.invoke();
           } catch (error) {
@@ -109,38 +124,161 @@ async function loadBoardRaw(port) {
   const result = await run();
   return result?.result;
 }
-/** All = read-only merge of the personal and team observations. No write target. */
-async function loadMergedBoard() {
-  const requirements = await window.atoDataPorts?.requirements?.().catch(() => null);
-  const ports = new Set(
-    (requirements?.bindings ?? []).map((binding) => binding.port_name),
-  );
-  const available = ["tasks", "team_tasks"].filter(
-    (port) => ports.size === 0 || ports.has(port),
-  );
-  const boards = [];
-  for (const port of available) boards.push(await loadBoardRaw(port));
-  const present = boards.filter(Boolean);
-  if (present.length === 0) throw new Error("board_invalid_shape");
-  const columns = present[0].columns;
+/** All = merge every connected Port; each task keeps the Port it came from. */
+async function readRequirements() {
+  if (window.atoDataPorts?.requirements)
+    return window.atoDataPorts.requirements().catch(() => null);
+  return fetch("/__ato/data-ports", { credentials: "same-origin" })
+    .then((response) => (response.ok ? response.json() : null))
+    .catch(() => null);
+}
+const boardParts = new Map();
+let boardBound = new Map();
+window.__atoBoardPartialErrors = [];
+function mergeBoards(entries, bound = boardBound) {
+  const columns = [];
+  const seenColumns = new Set();
   const tasks = {};
-  present.forEach((board, index) => {
+  for (const { port, board } of entries) {
+    for (const column of board.columns ?? [])
+      if (column?.id && !seenColumns.has(column.id)) {
+        seenColumns.add(column.id);
+        columns.push(column);
+      }
     for (const [taskId, task] of Object.entries(board.tasks ?? {})) {
-      tasks[(available[index] || `board` + index) + ":" + taskId] = {
+      const id = port + ":" + taskId;
+      tasks[id] = {
         ...task,
-        id: (available[index] || `board` + index) + ":" + taskId,
+        id,
+        __port: port,
+        __resourceId: bound.get(port) || null,
+        __columnId: task.columnId,
       };
     }
-  });
-  return { ...present[0], columns, tasks };
+  }
+  const first = entries[0]?.board || freshState();
+  return { ...first, columns, tasks };
+}
+async function loadMergedBoard() {
+  const requirements = await readRequirements();
+  const list = Array.isArray(requirements?.bindings)
+    ? requirements.bindings
+    : Array.isArray(requirements?.requirements)
+      ? requirements.requirements
+      : [];
+  const bound = new Map(
+    list
+      .filter((entry) => entry && entry.binding)
+      .map((entry) => [entry.port_name, entry.binding.resource_id || null]),
+  );
+  boardBound = bound;
+  const candidates = ["tasks", "shared_tasks", "team_tasks"];
+  const available = list.length
+    ? candidates.filter((port) => bound.has(port))
+    : candidates;
+  const entries = [];
+  const errors = [];
+  for (const port of available) {
+    try {
+      const board = await loadBoardRaw(port);
+      if (board) entries.push({ port, board });
+    } catch (error) {
+      errors.push({ port, code: error?.code || "board_unavailable" });
+    }
+  }
+  if (entries.length === 0)
+    throw Object.assign(new Error(errors[0]?.code || "board_invalid_shape"), {
+      code: errors[0]?.code || "board_invalid_shape",
+    });
+  boardParts.clear();
+  for (const entry of entries) boardParts.set(entry.port, entry.board);
+  window.__atoBoardPartialErrors = errors;
+  return mergeBoards(entries, bound);
+}
+function redrawParts() {
+  if (boardParts.size === 0) return false;
+  const merged = mergeBoards(
+    [...boardParts].map(([port, board]) => ({ port, board })),
+  );
+  window.__atoBoardDocument = structuredCloneSafe(merged);
+  delete window.__atoBoardError;
+  if (!touchDrag && !dragContext) {
+    state = loadState();
+    render();
+  }
+  setOperationControls();
+  return true;
+}
+/** A Port update replaces only that Port's tasks. */
+async function refreshPort(port) {
+  try {
+    const board = await loadBoardRaw(port);
+    if (!board) return;
+    boardParts.set(port, board);
+    window.__atoBoardPartialErrors = (
+      window.__atoBoardPartialErrors || []
+    ).filter((entry) => entry.port !== port);
+    redrawParts();
+    showSync("同期済み");
+  } catch (error) {
+    if (
+      /revoked|forbidden|unauthorized|data_port_not_connected|data_resource_unavailable/.test(
+        error?.code || "",
+      )
+    )
+      dropPort(port);
+  }
+}
+function dropPort(port) {
+  if (!boardParts.delete(port)) return;
+  const label = { tasks: "個人", shared_tasks: "共有", team_tasks: "チーム" }[port] || port;
+  if (boardParts.size === 0) {
+    delete window.__atoBoardDocument;
+    window.__atoBoardError = "data_port_not_connected";
+    state = freshState();
+    render();
+  } else redrawParts();
+  setOperationControls();
+  showSync(label + "の接続が解除されました");
+}
+function installPortSubscriptions() {
+  if (!window.atoDataPorts?.subscribe || boardPort() !== "all") return false;
+  for (const port of ["tasks", "shared_tasks", "team_tasks"]) {
+    try {
+      window.atoDataPorts.subscribe(port, () => refreshPort(port));
+    } catch {
+      /* a Port without a subscription keeps the page-level sync */
+    }
+  }
+  return true;
+}
+async function actorFenceChanged() {
+  try {
+    const context = await fetch("/__ato/data/context", {
+      credentials: "same-origin",
+    }).then((response) => (response.ok ? response.json() : null));
+    if (!context?.actor_fence) return false;
+    const previous = window.__atoActorFence;
+    window.__atoActorFence = context.actor_fence;
+    return previous != null && previous !== context.actor_fence;
+  } catch {
+    return false;
+  }
 }
 
 async function refreshBoard() {
   const sequence = ++boardReadSequence;
   boardReading++;
   try {
+    if (await actorFenceChanged()) {
+      try {
+        localStorage.removeItem("ato.task-board.state.v1");
+      } catch {}
+      boardParts.clear();
+      pendingOperation = null;
+    }
     const merged = boardPort() === "all";
-    window.__atoBoardReadOnly = merged;
+    window.__atoBoardReadOnly = false;
     const value = merged
       ? await loadMergedBoard()
       : await loadBoardRaw(boardPort());
@@ -170,6 +308,8 @@ async function refreshBoard() {
       render();
     }
     setOperationControls();
+    if (merged && window.__atoBoardPartialErrors?.length)
+      showSync("一部のデータを読み込めません");
     return true;
   } catch (error) {
     if (sequence !== boardReadSequence) return false;
@@ -197,10 +337,18 @@ async function runOperation(id, args, onSuccess) {
     toast("保存中です");
     return null;
   }
-  if (window.__atoBoardReadOnly) {
-    toast("統合表示では編集できません。Personal か Ato Team を選んでください");
-    return null;
-  }
+  // Writes follow the task's own Port; a new task uses the modal's target.
+  const portFromArgs = portForTaskId(args?.id);
+  const writePort =
+    portFromArgs ||
+    (typeof window.__atoBoardWritePort === "string" &&
+    window.__atoBoardWritePort
+      ? window.__atoBoardWritePort
+      : boardPort() === "all"
+        ? "tasks"
+        : boardPort());
+  if (args && typeof args.id === "string" && portFromArgs)
+    args = { ...args, id: localTaskId(args.id) };
   if (
     document.body.dataset.projectOperations === "true" &&
     ["todo_update", "todo_move", "todo_delete"].includes(id) &&
@@ -239,6 +387,7 @@ async function runOperation(id, args, onSuccess) {
       id,
       intent.input,
       intent.key,
+      id === "todo_board" ? undefined : writePort,
     );
     if (!intent.committed) {
       try {
@@ -300,14 +449,19 @@ window.__atoBoardSync = async () => {
 };
 refreshBoard().then((loaded) => {
   if (loaded) {
-    showSync("同期済み");
+    showSync(
+      window.__atoBoardPartialErrors?.length
+        ? "一部のデータを読み込めません"
+        : "同期済み",
+    );
     window.AtoRecurrence?.materializeToday();
   }
+  if (installPortSubscriptions()) return;
+  setTimeout(() => {
+    const bridge = window.__atoInstanceState;
+    bridge?.subscribe?.(() => window.__atoBoardSync());
+  }, 0);
 });
-setTimeout(() => {
-  const bridge = window.__atoInstanceState;
-  bridge?.subscribe?.(() => window.__atoBoardSync());
-}, 0);
 
 window.addEventListener("focus", () => window.__atoBoardSync());
 document.addEventListener("visibilitychange", () => {
