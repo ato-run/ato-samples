@@ -315,7 +315,59 @@ function formatDue(value) {
   return `${m}/${d}`;
 }
 
+// A board that could not be read is shown as a failure, never as an empty
+// board: the columns of a fresh state would claim the person has no tasks.
+function boardStatusLabel(code) {
+  switch (String(code || "")) {
+    case "data_port_not_connected":
+      return "この実行環境はまだボードに接続されていません。";
+    case "data_resource_unavailable":
+      return "接続されているボードが見つかりませんでした。";
+    case "data_port_unavailable":
+      return "接続されているボードを読み取れませんでした。";
+    default:
+      return "正本を取得できません: " + String(code || "board_unavailable");
+  }
+}
+
+function renderBoardStatusPanel() {
+  if (window.__atoBoardStatus !== "error") return false;
+  const code = window.__atoBoardError || "board_unavailable";
+  dom.board.innerHTML = "";
+  const panel = document.createElement("section");
+  panel.className = "board-status";
+  panel.setAttribute("role", "alert");
+  const title = document.createElement("h2");
+  title.textContent = "ボードを読み込めませんでした";
+  const detail = document.createElement("p");
+  detail.textContent = boardStatusLabel(code);
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "primary";
+  retry.textContent = "再試行";
+  retry.onclick = async function () {
+    retry.disabled = true;
+    try {
+      if (typeof refreshBoard === "function") {
+        const loaded = await refreshBoard();
+        if (loaded) {
+          state = loadState();
+          render();
+        }
+      }
+    } finally {
+      retry.disabled = false;
+    }
+  };
+  panel.append(title, detail, retry);
+  dom.board.appendChild(panel);
+  dom.globalAdd.disabled = true;
+  return true;
+}
+
 function render() {
+  if (renderBoardStatusPanel()) return;
+  dom.globalAdd.disabled = false;
   const columns = getColumns();
   dom.board.innerHTML = "";
   const selectedColumn = dom.column.value;
