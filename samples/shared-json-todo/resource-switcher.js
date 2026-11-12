@@ -147,10 +147,16 @@
     try {
       payload = await loadRequirements();
     } catch (error) {
-      window.__atoBoardStatus = "error";
-      window.__atoBoardError = (error && error.code) || "data_bridge_failed";
-      render();
-      degrade(error && error.code);
+      // The switcher's own failure is reported in the switcher. The board keeps
+      // whatever state its own read produced: one failing read must not decide
+      // the other, and a working board stays usable.
+      if (core.isBridgeUnavailable(error)) {
+        degrade(error && error.code);
+        return;
+      }
+      view = null;
+      errorText = messageFor(error);
+      setOpen(true);
       return;
     }
     if (!payload) {
