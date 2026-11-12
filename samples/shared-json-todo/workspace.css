@@ -2507,3 +2507,19 @@ body.nav-open {
   line-height: 16px;
   vertical-align: middle;
 }
+
+.shared-picker {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  margin: 6px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 12px;
+}
+.shared-picker button {
+  min-height: 32px;
+  justify-content: flex-start;
+  text-align: left;
+}

@@ -94,65 +94,110 @@
     window.__atoBoardSetPort?.(boardSelect.value);
     setView(ui.view, ui.screen);
   });
-  // Ask the first-party surface to connect the optional shared Port. The App
-  // never receives a Resource list; it only asks and waits for approval.
+  // The platform's Data Port bridge already offers candidate Resources scoped
+  // to this Port and a first-party connect. The App never sees the account's
+  // full Resource list. Grants to other people stay on the first-party surface.
   const sharedConnect = document.createElement("button");
   sharedConnect.type = "button";
   sharedConnect.className = "secondary rail-shared-connect";
   sharedConnect.textContent = "共有タスクを追加";
   sharedConnect.hidden = true;
   document.querySelector(".workspace-rail nav")?.before(sharedConnect);
-  const readPorts = () =>
-    window.atoDataPorts?.requirements
-      ? Promise.resolve(window.atoDataPorts.requirements())
-      : fetch("/__ato/data-ports", { credentials: "same-origin" })
-          .then((response) => (response.ok ? response.json() : null))
-          .catch(() => null);
+  const sharedPicker = document.createElement("div");
+  sharedPicker.className = "shared-picker";
+  sharedPicker.hidden = true;
+  sharedConnect.after(sharedPicker);
   const refreshSharedConnect = () =>
-    readPorts().then((requirements) => {
-      const list = Array.isArray(requirements?.bindings)
-        ? requirements.bindings
-        : Array.isArray(requirements?.requirements)
-          ? requirements.requirements
-          : [];
-      const shared = list.find((entry) => entry.port_name === "shared_tasks");
-      sharedConnect.hidden = !(shared && !shared.binding);
-    }).catch(() => { sharedConnect.hidden = true; });
-  sharedConnect.addEventListener("click", async () => {
-    sharedConnect.disabled = true;
-    sharedConnect.textContent = "承認待ち…";
-    try {
-      const response = await fetch("/__ato/data/connect-requests", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ port: "shared_tasks" }),
+    loadRequirements()
+      .then((requirements) => {
+        const list = Array.isArray(requirements?.bindings)
+          ? requirements.bindings
+          : Array.isArray(requirements?.requirements)
+            ? requirements.requirements
+            : [];
+        const shared = list.find((entry) => entry.port_name === "shared_tasks");
+        sharedConnect.hidden = !(shared && !shared.binding);
+      })
+      .catch(() => {
+        sharedConnect.hidden = true;
       });
-      if (!response.ok) throw new Error("connect_request_failed");
-      const { request_id: requestId } = await response.json();
-      const timer = setInterval(async () => {
-        try {
-          const status = await fetch(
-            "/__ato/data/connect-requests/" + encodeURIComponent(requestId),
-            { credentials: "same-origin" },
-          ).then((r) => r.json());
-          if (status.status === "approved") {
-            clearInterval(timer);
-            location.reload();
-          } else if (status.status === "denied") {
-            clearInterval(timer);
-            sharedConnect.disabled = false;
-            sharedConnect.textContent = "共有タスクを追加";
-            refreshSharedConnect();
-          }
-        } catch {
-          /* keep polling while the surface is reachable */
-        }
-      }, 2000);
-    } catch {
-      sharedConnect.disabled = false;
-      sharedConnect.textContent = "共有タスクを追加";
+  async function connectSharedPort(resourceId, expectedEpoch) {
+    const response = await fetch("/__ato/data-ports/shared_tasks/connect", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        resource_id: resourceId,
+        expected_epoch: expectedEpoch,
+        access: "write",
+      }),
+    });
+    if (!response.ok) throw new Error("connect_failed");
+    location.reload();
+  }
+  async function candidates() {
+    const response = await fetch(
+      "/__ato/data-ports/shared_tasks/candidates?access=write",
+      { credentials: "same-origin" },
+    );
+    return response.ok ? response.json() : null;
+  }
+  sharedConnect.addEventListener("click", async () => {
+    if (!sharedPicker.hidden) {
+      sharedPicker.hidden = true;
+      return;
     }
+    sharedPicker.hidden = false;
+    sharedPicker.textContent = "読み込み中…";
+    const page = await candidates().catch(() => null);
+    if (!page) {
+      sharedPicker.textContent = "共有候補を取得できません。";
+      return;
+    }
+    sharedPicker.textContent = "";
+    for (const resource of page.resources || []) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = resource.display_name || "名前のないデータ";
+      button.addEventListener("click", () =>
+        connectSharedPort(resource.resource_id, resource.access_epoch).catch(
+          () => {
+            sharedPicker.textContent = "接続できませんでした。";
+          },
+        ),
+      );
+      sharedPicker.append(button);
+    }
+    const create = document.createElement("button");
+    create.type = "button";
+    create.className = "secondary";
+    create.textContent = "新しい共有ボードを作成";
+    create.addEventListener("click", async () => {
+      create.disabled = true;
+      try {
+        const created = await fetch("/__ato/data-resources", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            display_name: "共有タスク",
+            document: freshState(),
+          }),
+        });
+        if (!created.ok) throw new Error("create_failed");
+        const { resource_id: resourceId } = await created.json();
+        const next = await candidates();
+        const resource = next?.resources?.find(
+          (entry) => entry.resource_id === resourceId,
+        );
+        if (!resource) throw new Error("candidate_missing");
+        await connectSharedPort(resource.resource_id, resource.access_epoch);
+      } catch {
+        create.disabled = false;
+        sharedPicker.textContent = "共有ボードを作成できませんでした。";
+      }
+    });
+    sharedPicker.append(create);
   });
   refreshSharedConnect();
   const portFilterLabel = document.createElement("label");
