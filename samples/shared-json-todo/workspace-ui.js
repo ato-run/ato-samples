@@ -86,6 +86,67 @@
     window.__atoBoardSetPort?.(boardSelect.value);
     setView(ui.view, ui.screen);
   });
+  // Ask the first-party surface to connect the optional shared Port. The App
+  // never receives a Resource list; it only asks and waits for approval.
+  const sharedConnect = document.createElement("button");
+  sharedConnect.type = "button";
+  sharedConnect.className = "secondary rail-shared-connect";
+  sharedConnect.textContent = "共有タスクを追加";
+  sharedConnect.hidden = true;
+  document.querySelector(".workspace-rail nav")?.before(sharedConnect);
+  const readPorts = () =>
+    window.atoDataPorts?.requirements
+      ? Promise.resolve(window.atoDataPorts.requirements())
+      : fetch("/__ato/data-ports", { credentials: "same-origin" })
+          .then((response) => (response.ok ? response.json() : null))
+          .catch(() => null);
+  const refreshSharedConnect = () =>
+    readPorts().then((requirements) => {
+      const list = Array.isArray(requirements?.bindings)
+        ? requirements.bindings
+        : Array.isArray(requirements?.requirements)
+          ? requirements.requirements
+          : [];
+      const shared = list.find((entry) => entry.port_name === "shared_tasks");
+      sharedConnect.hidden = !(shared && !shared.binding);
+    }).catch(() => { sharedConnect.hidden = true; });
+  sharedConnect.addEventListener("click", async () => {
+    sharedConnect.disabled = true;
+    sharedConnect.textContent = "承認待ち…";
+    try {
+      const response = await fetch("/__ato/data/connect-requests", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ port: "shared_tasks" }),
+      });
+      if (!response.ok) throw new Error("connect_request_failed");
+      const { request_id: requestId } = await response.json();
+      const timer = setInterval(async () => {
+        try {
+          const status = await fetch(
+            "/__ato/data/connect-requests/" + encodeURIComponent(requestId),
+            { credentials: "same-origin" },
+          ).then((r) => r.json());
+          if (status.status === "approved") {
+            clearInterval(timer);
+            location.reload();
+          } else if (status.status === "denied") {
+            clearInterval(timer);
+            sharedConnect.disabled = false;
+            sharedConnect.textContent = "共有タスクを追加";
+            refreshSharedConnect();
+          }
+        } catch {
+          /* keep polling while the surface is reachable */
+        }
+      }, 2000);
+    } catch {
+      sharedConnect.disabled = false;
+      sharedConnect.textContent = "共有タスクを追加";
+    }
+  });
+  refreshSharedConnect();
   controls.querySelector("#sortSelect").value = ui.sort;
   controls.querySelector("#groupSelect").value = ui.group;
   const dragHelp = document.createElement("p");

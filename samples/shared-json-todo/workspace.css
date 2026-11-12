@@ -2478,3 +2478,11 @@ body.nav-open {
     min-height: 44px;
   }
 }
+
+.rail-shared-connect {
+  width: 100%;
+  min-height: 36px;
+  margin: 8px 0 0;
+  justify-content: center;
+  font-size: 12px;
+}
