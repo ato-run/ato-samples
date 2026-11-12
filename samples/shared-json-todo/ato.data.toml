@@ -48,3 +48,26 @@ operations = [
   "todo_team_board",
   "todo_team_list_due_dates",
 ]
+
+
+[[port]]
+name = "shared_tasks"
+protocol = "todo.board@1"
+scope = "user"
+access = "operations"
+required = false
+operations = [
+  "todo_shared_list",
+  "todo_shared_get",
+  "todo_shared_get_by_number",
+  "todo_shared_create",
+  "todo_shared_update",
+  "todo_shared_initialize",
+  "todo_shared_move",
+  "todo_shared_delete",
+  "todo_shared_archive_done",
+  "todo_shared_reset",
+  "todo_shared_replace_board",
+  "todo_shared_board",
+  "todo_shared_list_due_dates",
+]
