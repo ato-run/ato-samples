@@ -41,11 +41,13 @@ async function refreshBoard() {
       // Not connected: the legacy local state is the only available view.
       delete window.__atoBoardError;
       window.__atoBoardStatus = boardFailureStatus(code);
-      return false;
+    } else {
+      window.__atoBoardError = code || "board_unavailable";
+      window.__atoBoardStatus = boardFailureStatus(window.__atoBoardError);
     }
-    window.__atoBoardError = code || "board_unavailable";
-    window.__atoBoardStatus = boardFailureStatus(window.__atoBoardError);
   }
+  // Every outcome repaints: an error panel left over from an earlier attempt
+  // must disappear as soon as the state it described is gone.
   window.__atoBoardDocument = undefined;
   state = loadState();
   render();

@@ -675,7 +675,7 @@
     }
 
     .board-option:hover { background: var(--panel-2); }
-    .board-option[aria-selected="true"] { border-color: var(--line); background: var(--panel-2); }
+    .board-option[aria-current="true"] { border-color: var(--line); background: var(--panel-2); }
 
     .board-option-name {
       overflow: hidden;

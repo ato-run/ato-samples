@@ -203,7 +203,7 @@
     button.type = "button";
     button.className = "board-option";
     button.dataset.resourceId = entry.resource_id;
-    button.setAttribute("aria-selected", entry.is_current ? "true" : "false");
+    if (entry.is_current) button.setAttribute("aria-current", "true");
     const name = document.createElement("span");
     name.className = "board-option-name";
     name.textContent = entry.display_name || "名称未設定のボード";
@@ -323,12 +323,11 @@
   }
 
   async function bindAndLoad(resourceId, expectedEpoch, displayName) {
-    const result = await core.connectBoard(BRIDGE, PORT_NAME, {
+    await core.connectBoard(BRIDGE, PORT_NAME, {
       resourceId: resourceId,
       expectedEpoch: expectedEpoch,
     });
-    access = result.access === "read" ? "read" : "read_write";
-    window.__atoBoardReadOnly = access === "read";
+    // What the binding actually got is read back, not assumed from the request.
     const fresh = await BRIDGE.requirements();
     const plan = core.startupPlan(fresh, PORT_NAME, null);
     if (plan.kind !== "bound") throw core.dataBridgeError("data_binding_conflict");
