@@ -5,6 +5,7 @@
   taskMatchesFilters = function (task) {
     return (
       baseMatches(task) &&
+      (ui.portFilter ? (task.__port || "tasks") === ui.portFilter : true) &&
       (!ui.status || task.columnId === ui.status) &&
       (!ui.project ||
         (ui.project === "unassigned"

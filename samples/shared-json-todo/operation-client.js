@@ -1,6 +1,6 @@
 "use strict";
 // Resource authority only: observations render; prepared Operations commit.
-const DEFAULT_BOARD_PORT = "tasks";
+const DEFAULT_BOARD_PORT = "all";
 let pendingOperation = null;
 let operationBusy = false;
 let boardReadSequence = 0;
@@ -23,19 +23,34 @@ function boardPort() {
     return window.__atoBoardPort || DEFAULT_BOARD_PORT;
   }
 }
-/** The team Port has its own operation set in the manifest (state.port). */
+const PORT_PREFIXES = { tasks: "tasks", shared_tasks: "shared_tasks", team_tasks: "team_tasks" };
+const PORT_LABELS = { tasks: "個人", shared_tasks: "共有", team_tasks: "チーム" };
+/** Task ids in the merged view carry their Resource's Port. */
+function portForTaskId(id) {
+  const value = typeof id === "string" ? id : "";
+  for (const port of Object.keys(PORT_PREFIXES))
+    if (value.startsWith(port + ":")) return port;
+  return null;
+}
+function localTaskId(id) {
+  const port = portForTaskId(id);
+  return port ? id.slice(port.length + 1) : id;
+}
+/** Each Port has its own operation set in the manifest (state.port). */
 function operationForPort(port, operation) {
-  if (
-    port === "team_tasks" &&
-    operation.startsWith("todo_") &&
-    !operation.startsWith("todo_team_")
-  )
-    return "todo_team_" + operation.slice("todo_".length);
+  const prefix =
+    port === "shared_tasks"
+      ? "todo_shared_"
+      : port === "team_tasks"
+        ? "todo_team_"
+        : null;
+  if (prefix && operation.startsWith("todo_") && !operation.startsWith(prefix))
+    return prefix + operation.slice("todo_".length);
   return operation;
 }
-/** Address the selected Port explicitly; fall back to the served instance Port. */
-function prepareOnPort(operation, args, key) {
-  const port = boardPort();
+/** Address a Port explicitly; fall back to the served instance Port. */
+function prepareOnPort(operation, args, key, portOverride) {
+  const port = portOverride || boardPort();
   const scoped = operationForPort(port, operation);
   if (window.atoDataPorts?.request)
     return window.atoDataPorts.request(port, scoped, args, key);
@@ -94,7 +109,7 @@ async function loadBoardRaw(port) {
       ? () =>
           window.atoDataPorts.invoke(port, operationForPort(port, "todo_board"), {}, key)
       : async () => {
-          const handle = await prepareOnPort("todo_board", {}, key);
+          const handle = await prepareOnPort("todo_board", {}, key, port);
           try {
             return await handle.invoke();
           } catch (error) {
@@ -109,30 +124,61 @@ async function loadBoardRaw(port) {
   const result = await run();
   return result?.result;
 }
-/** All = read-only merge of the personal and team observations. No write target. */
+/** All = merge every connected Port; each task keeps the Port it came from. */
+async function readRequirements() {
+  if (window.atoDataPorts?.requirements)
+    return window.atoDataPorts.requirements().catch(() => null);
+  return fetch("/__ato/data-ports", { credentials: "same-origin" })
+    .then((response) => (response.ok ? response.json() : null))
+    .catch(() => null);
+}
 async function loadMergedBoard() {
-  const requirements = await window.atoDataPorts?.requirements?.().catch(() => null);
-  const ports = new Set(
-    (requirements?.bindings ?? []).map((binding) => binding.port_name),
+  const requirements = await readRequirements();
+  const list = Array.isArray(requirements?.bindings)
+    ? requirements.bindings
+    : Array.isArray(requirements?.requirements)
+      ? requirements.requirements
+      : [];
+  const bound = new Map(
+    list
+      .filter((entry) => entry && entry.binding)
+      .map((entry) => [entry.port_name, entry.binding.resource_id || null]),
   );
-  const available = ["tasks", "team_tasks"].filter(
-    (port) => ports.size === 0 || ports.has(port),
-  );
+  const candidates = ["tasks", "shared_tasks", "team_tasks"];
+  const available = list.length
+    ? candidates.filter((port) => bound.has(port))
+    : candidates;
   const boards = [];
-  for (const port of available) boards.push(await loadBoardRaw(port));
-  const present = boards.filter(Boolean);
-  if (present.length === 0) throw new Error("board_invalid_shape");
-  const columns = present[0].columns;
+  for (const port of available) {
+    try {
+      const board = await loadBoardRaw(port);
+      if (board) boards.push({ port, board });
+    } catch {
+      /* one unusable Port must not hide the others */
+    }
+  }
+  if (boards.length === 0) throw new Error("board_invalid_shape");
+  const columns = [];
+  const seenColumns = new Set();
   const tasks = {};
-  present.forEach((board, index) => {
+  for (const { port, board } of boards) {
+    for (const column of board.columns ?? [])
+      if (column?.id && !seenColumns.has(column.id)) {
+        seenColumns.add(column.id);
+        columns.push(column);
+      }
     for (const [taskId, task] of Object.entries(board.tasks ?? {})) {
-      tasks[(available[index] || `board` + index) + ":" + taskId] = {
+      const id = port + ":" + taskId;
+      tasks[id] = {
         ...task,
-        id: (available[index] || `board` + index) + ":" + taskId,
+        id,
+        __port: port,
+        __resourceId: bound.get(port) || null,
+        __columnId: task.columnId,
       };
     }
-  });
-  return { ...present[0], columns, tasks };
+  }
+  return { ...boards[0].board, columns, tasks };
 }
 
 async function refreshBoard() {
@@ -140,7 +186,7 @@ async function refreshBoard() {
   boardReading++;
   try {
     const merged = boardPort() === "all";
-    window.__atoBoardReadOnly = merged;
+    window.__atoBoardReadOnly = false;
     const value = merged
       ? await loadMergedBoard()
       : await loadBoardRaw(boardPort());
@@ -197,10 +243,18 @@ async function runOperation(id, args, onSuccess) {
     toast("保存中です");
     return null;
   }
-  if (window.__atoBoardReadOnly) {
-    toast("統合表示では編集できません。Personal か Ato Team を選んでください");
-    return null;
-  }
+  // Writes follow the task's own Port; a new task uses the modal's target.
+  const portFromArgs = portForTaskId(args?.id);
+  const writePort =
+    portFromArgs ||
+    (typeof window.__atoBoardWritePort === "string" &&
+    window.__atoBoardWritePort
+      ? window.__atoBoardWritePort
+      : boardPort() === "all"
+        ? "tasks"
+        : boardPort());
+  if (args && typeof args.id === "string" && portFromArgs)
+    args = { ...args, id: localTaskId(args.id) };
   if (
     document.body.dataset.projectOperations === "true" &&
     ["todo_update", "todo_move", "todo_delete"].includes(id) &&
@@ -239,6 +293,7 @@ async function runOperation(id, args, onSuccess) {
       id,
       intent.input,
       intent.key,
+      id === "todo_board" ? undefined : writePort,
     );
     if (!intent.committed) {
       try {

@@ -38,13 +38,21 @@
   const boardContext = document.createElement("label");
   boardContext.className = "board-context";
   boardContext.innerHTML =
-    '<span>Board</span><select id="boardSelect"><option value="tasks">Personal</option><option value="team_tasks">Ato Team</option><option value="all">All</option></select>';
+    '<span>表示対象</span><select id="boardSelect"><option value="all">すべて（個人＋共有）</option><option value="tasks">個人</option><option value="shared_tasks">共有</option><option value="team_tasks">チーム</option></select>';
   controls.prepend(boardContext);
   const boardSelect = boardContext.querySelector("#boardSelect");
   try {
     boardSelect.value = window.localStorage.getItem("ato.board.port") || "tasks";
   } catch {
-    boardSelect.value = "tasks";
+    boardSelect.value = "all";
+  }
+  // The stored preference and the effective Port can disagree (for example
+  // when the merged default kicks in), so show what is actually read.
+  try {
+    boardSelect.value =
+      typeof boardPort === "function" ? boardPort() : boardSelect.value;
+  } catch {
+    /* keep the option already selected */
   }
   // The hosted App host does not inject window.atoDataPorts; it serves the same
   // answer at /__ato/data-ports. The selfhost bridge keeps its injected call.
@@ -147,6 +155,13 @@
     }
   });
   refreshSharedConnect();
+  const portFilterLabel = document.createElement("label");
+  portFilterLabel.innerHTML =
+    '<span>表示</span><select id="portFilter"><option value="">すべて</option><option value="tasks">個人</option><option value="shared_tasks">共有</option><option value="team_tasks">チーム</option></select>';
+  controls.querySelector(".view-presentation").append(portFilterLabel);
+  const portFilter = controls.querySelector("#portFilter");
+  portFilter.value = ui.portFilter || "";
+  portFilter.setAttribute("aria-label", "個人・共有の絞り込み");
   controls.querySelector("#sortSelect").value = ui.sort;
   controls.querySelector("#groupSelect").value = ui.group;
   const dragHelp = document.createElement("p");
@@ -173,6 +188,16 @@
   notice.className = "board-availability";
   notice.setAttribute("role", "status");
   controls.after(notice);
+  const targetField = document.createElement("div");
+  targetField.className = "field";
+  targetField.innerHTML =
+    '<label for="taskTargetSelect">保存先</label><select id="taskTargetSelect" class="control"><option value="tasks">個人</option><option value="shared_tasks">共有</option><option value="team_tasks">チーム</option></select>';
+  document.querySelector(".modal-body").append(targetField);
+  const targetSelect = targetField.querySelector("#taskTargetSelect");
+  targetSelect.value = boardSelect.value === "all" ? "tasks" : boardSelect.value;
+  targetSelect.addEventListener("change", () => {
+    window.__atoBoardWritePort = targetSelect.value;
+  });
   const projectField = document.createElement("div");
   projectField.className = "field";
   projectField.innerHTML =
@@ -411,7 +436,19 @@
   renderTaskCard = function (task) {
     const card = baseCard(task);
     const meta = card.querySelector(".task-meta");
-    if (meta) meta.innerHTML = selectors.meta(task);
+    if (meta) {
+      meta.innerHTML = selectors.meta(task);
+      meta.querySelector(".task-status")?.remove();
+      if (task.__port) {
+        const badge = document.createElement("span");
+        badge.className = "task-port";
+        badge.textContent =
+          { tasks: "個人", shared_tasks: "共有", team_tasks: "チーム" }[
+            task.__port
+          ] || task.__port;
+        meta.prepend(badge);
+      }
+    }
     if (ui.description && task.description) {
       const text = document.createElement("p");
       text.className = "card-description";
@@ -425,6 +462,7 @@
       statusFilter: "status",
       groupSelect: "group",
       sortSelect: "sort",
+      portFilter: "portFilter",
     };
     if (map[event.target.id]) ui[map[event.target.id]] = event.target.value;
     if (event.target.id === "descriptionDisplay")

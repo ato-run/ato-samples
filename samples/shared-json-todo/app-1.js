@@ -371,7 +371,10 @@ function renderTaskCard(task) {
   const dueTag = task.dueAt
     ? `<span class="tag ${isOverdue(task) ? "overdue" : ""}">Due ${escapeHtml(formatDue(task.dueAt))}</span>`
     : "";
-  card.innerHTML = `<div class="task-topline"><div class="task-title" data-open-task="${escapeAttr(task.id)}"><span class="task-number">${escapeHtml(formatTaskNumber(task.number))}</span>${escapeHtml(task.title)}</div><button class="drag-handle" data-task-handle="${escapeAttr(task.id)}" aria-label="ドラッグして移動">${TaskBoardIcons.icon("grip")}</button></div><div class="task-meta">${priorityTag}${dueTag}${task.completed ? `<span class="tag">Done</span>` : ""}</div>${subCount ? `<div class="sub-progress"><div class="progress-track"><i style="width:${progress}%"></i></div><div class="progress-text">${doneCount}/${subCount}</div></div>` : ""}`;
+  const portTag = task.__port
+    ? `<span class="tag task-port">${{ tasks: "個人", shared_tasks: "共有", team_tasks: "チーム" }[task.__port] || task.__port}</span>`
+    : "";
+  card.innerHTML = `<div class="task-topline"><div class="task-title" data-open-task="${escapeAttr(task.id)}"><span class="task-number">${escapeHtml(formatTaskNumber(task.number))}</span>${escapeHtml(task.title)}</div><button class="drag-handle" data-task-handle="${escapeAttr(task.id)}" aria-label="ドラッグして移動">${TaskBoardIcons.icon("grip")}</button></div><div class="task-meta">${portTag}${priorityTag}${dueTag}${task.completed ? `<span class="tag">Done</span>` : ""}</div>${subCount ? `<div class="sub-progress"><div class="progress-track"><i style="width:${progress}%"></i></div><div class="progress-text">${doneCount}/${subCount}</div></div>` : ""}`;
   return card;
 }
 
