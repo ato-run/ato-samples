@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#f6f7f9" />
-  <meta name="description" content="ato.run向け、クライアントサイドだけで動く同期対応タスク管理ボード" />
+  <meta name="description" content="ato.runの個人・共有タスクボード" />
   <title>Task Board</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -13,15 +13,18 @@
     <div class="topbar">
       <div class="brand">
         <h1>Task Board</h1>
-        <p>ドラッグで整理。状態はクライアント側の1つのJSONとして保存され、ato.run側のlocalStorage同期にそのまま載せられます。</p>
       </div>
-      <div class="sync-pill" title="localStorage + storage event + BroadcastChannel">
+      <div class="sync-pill" role="status">
         <span class="sync-dot"></span>
         <span id="syncLabel">同期準備完了</span>
       </div>
     </div>
 
     <div class="board-header">
+      <select id="boardPortSelect" class="control" aria-label="タスクの表示範囲" hidden>
+        <option value="tasks">個人</option>
+        <option value="shared_tasks">共有</option>
+      </select>
       <button
         id="boardSwitcherBtn"
         class="board-switcher-btn"

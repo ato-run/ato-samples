@@ -226,7 +226,6 @@
       date: localDateString(new Date()),
     });
   let lastCheckedDate = localDateString(new Date());
-  setTimeout(materialize, 0);
   setInterval(() => {
     const date = localDateString(new Date());
     if (date !== lastCheckedDate)

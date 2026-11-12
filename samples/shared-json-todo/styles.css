@@ -589,6 +589,7 @@
     .board-header {
       position: relative;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 10px;
       margin-bottom: 12px;
@@ -598,6 +599,7 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      min-width: 0;
       max-width: min(520px, 100%);
       min-height: 40px;
       padding: 0 13px;

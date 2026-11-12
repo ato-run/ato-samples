@@ -1,10 +1,29 @@
-# The board lives in a user-owned DataResource. The Port names the protocol;
-# which Resource it points at is decided at runtime by the person via consent.
-schema = "ato.data-ports/1"
+# Each Port is bound independently by the signed-in user.
+schema = "ato.data-ports/2"
 
 [[port]]
 name = "tasks"
 protocol = "todo.board@1"
 scope = "user"
-access = "read_write"
+access = "operations"
 required = true
+operations = [
+  "todo_list_due_dates", "todo_list", "todo_get", "todo_get_by_number",
+  "todo_create", "todo_update", "todo_initialize", "todo_move", "todo_delete",
+  "todo_archive_done", "todo_reset", "todo_replace_board", "todo_board",
+  "todo_list_shared", "todo_set_shared",
+]
+
+[[port]]
+name = "shared_tasks"
+protocol = "todo.board@1"
+scope = "user"
+access = "operations"
+required = false
+operations = [
+  "todo_shared_list_due_dates", "todo_shared_list", "todo_shared_get",
+  "todo_shared_get_by_number", "todo_shared_create", "todo_shared_update",
+  "todo_shared_initialize", "todo_shared_move", "todo_shared_delete",
+  "todo_shared_archive_done", "todo_shared_reset", "todo_shared_replace_board",
+  "todo_shared_board",
+]

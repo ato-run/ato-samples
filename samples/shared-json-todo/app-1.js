@@ -180,10 +180,10 @@ function normalizeState(input) {
 }
 
 // The board's authoritative copy is the DataResource document. The operation
-// client refreshes this snapshot from the todo_board observation; localStorage
-// is only the legacy fallback while an instance is not connected yet.
+// client refreshes the snapshot from the selected Port's observation.
 function rawBoardDocument() {
   if (window.__atoBoardDocument) return window.__atoBoardDocument;
+  if (window.atoInstanceOperations || window.__atoBoardError) return null;
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
   } catch (_) {
@@ -218,6 +218,8 @@ function structuredCloneSafe(value) {
 }
 
 function acceptRemoteState(incoming, source) {
+  if (window.atoInstanceOperations || window.__atoBoardDocument || window.__atoBoardError)
+    return;
   const next = normalizeState(incoming);
   if (touchDrag || dragContext) {
     pendingRemoteState = next;
@@ -331,6 +333,11 @@ function boardStatusLabel(code) {
 }
 
 function renderBoardStatusPanel() {
+  if (window.__atoBoardStatus === "loading") {
+    dom.board.textContent = "ボードを読み込み中";
+    dom.globalAdd.disabled = true;
+    return true;
+  }
   if (window.__atoBoardStatus !== "error") return false;
   const code = window.__atoBoardError || "board_unavailable";
   dom.board.innerHTML = "";
