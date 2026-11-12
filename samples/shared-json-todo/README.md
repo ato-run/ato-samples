@@ -39,6 +39,61 @@ The second projection is **`todo_list_shared`**: the owner marks a task as
 shared with `todo_set_shared`, and this operation returns only those tasks,
 limited to `task_id`, `number`, `title`, `status` and `due_at`.
 
+## Choosing which board this app uses
+
+The board header shows the DataResource this instance is bound to. Clicking it
+lists the boards the person may use — the current board, their personal boards,
+team boards, any other accessible `todo.board@1` Resource — plus **Create a new
+board**. Picking one is an explicit user action that becomes a Binding; the
+platform never chooses a Resource for the app, and the app never reads one it
+was not granted.
+
+The UI talks to the app-facing Resource bridge (same origin, instance scoped)
+and nothing else:
+
+| Call | Used for |
+| --- | --- |
+| `GET /__ato/data-ports` | the declared port `tasks` and its current binding |
+| `GET /__ato/data-ports/tasks/candidates?access=read` | the boards to offer |
+| `POST /__ato/data-ports/tasks/connect` | binding `{ resource_id, expected_epoch, access }` |
+| `POST /__ato/data-resources` | creating a board `{ display_name, document }` |
+
+Behaviour:
+
+- **Bound**: the app reads the board through its own operations
+  (`todo_board` / `todo_list`). Nothing else changes.
+- **Not bound**: the chooser opens by itself. No candidates offers create
+  instead; a single candidate is still confirmed by hand, so the first binding
+  is never implicit.
+- **First read fails**: the board area shows an error with a retry, never an
+  empty board — "no tasks" and "could not read" are different states.
+- **Remembered board**: the last selection is kept in `localStorage` under
+  `ato.task-board.resource.v1` as a UI hint only. Every start re-reads
+  `GET /__ato/data-ports`; when the binding is gone the chooser opens and the
+  hint is only used to say which board is no longer available.
+- **Read-only grant**: when the binding is read-only the app says so and refuses
+  edits locally; the server still enforces it.
+
+The grouping uses the `owner_kind` of each candidate (`user`/`personal` →
+personal, `team`/`organization` → team, anything else → other). A Resource the
+candidates list does not include (internal listing, personal slot) is added from
+the current binding so the active board is always visible.
+
+### Tests
+
+```sh
+cd samples/shared-json-todo
+node --check resource-switcher-core.js
+node --check resource-switcher.js
+node --check operation-client.js
+node --check app-1.js
+node --test "tests/*.test.mjs"
+```
+
+The tests are DOM-free: `resource-switcher-core.js` holds the bridge client and
+the selection rules, and is evaluated in a Node `vm` sandbox against a stub
+`fetch` (no browser, no dependency install).
+
 ## Team sharing (selected tasks only)
 
 A task carries a `shared` flag that the owner toggles with `todo_set_shared`.

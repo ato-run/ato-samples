@@ -21,6 +21,30 @@
       </div>
     </div>
 
+    <div class="board-header">
+      <button
+        id="boardSwitcherBtn"
+        class="board-switcher-btn"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-controls="boardSwitcherPanel"
+      >
+        <span id="boardSwitcherName" class="board-switcher-name">Task Board</span>
+        <span class="board-switcher-caret" aria-hidden="true">▾</span>
+      </button>
+      <span id="boardAccessBadge" class="board-access-badge" hidden>読み取り専用</span>
+      <div
+        id="boardSwitcherPanel"
+        class="board-switcher-panel"
+        role="dialog"
+        aria-label="ボードを選択"
+        hidden
+      >
+        <div id="boardSwitcherBody" class="board-switcher-body"></div>
+      </div>
+    </div>
+
     <section class="toolbar">
       <input id="searchInput" class="control search" type="search" placeholder="タスクを検索…" autocomplete="off" />
       <select id="priorityFilter" class="control" aria-label="優先度で絞り込み">
@@ -114,6 +138,7 @@
 
   <div id="toast" class="toast"></div>
 
+  <script src="./resource-switcher-core.js"></script>
   <script src="./app-1.js"></script>
   <script src="./operation-client.js"></script>
   <script src="./app-2.js"></script>
@@ -122,5 +147,6 @@
   <script src="./app-5.js"></script>
   <script src="./app-6.js"></script>
   <script src="./app-7.js"></script>
+  <script src="./resource-switcher.js"></script>
 </body>
 </html>
