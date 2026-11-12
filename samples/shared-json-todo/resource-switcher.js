@@ -30,7 +30,6 @@
   };
   if (!dom.header || !dom.button || !dom.panel || !dom.body) return;
 
-  let requirements = null;
   let binding = null;
   let access = "read_write";
   let view = null;
@@ -117,7 +116,6 @@
   }
 
   async function applyPlan(payload, options) {
-    requirements = payload;
     const plan = core.startupPlan(payload, PORT_NAME, core.readHint(window.localStorage));
     if (plan.kind === "error") {
       degrade("data_port_not_declared");
@@ -331,7 +329,6 @@
     const fresh = await BRIDGE.requirements();
     const plan = core.startupPlan(fresh, PORT_NAME, null);
     if (plan.kind !== "bound") throw core.dataBridgeError("data_binding_conflict");
-    requirements = fresh;
     binding = plan.binding;
     access = core.accessOf(plan.binding);
     window.__atoBoardReadOnly = access === "read";
