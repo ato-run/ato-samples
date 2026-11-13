@@ -437,52 +437,18 @@ export function boardDocument({ state }) {
   return { operations: [], result: readBoardState(state) };
 }
 
-// Calendar's whole contract: four fields per task with a due date. The board
-// document (descriptions, subtasks, columns, recurrences) never leaves this
-// handler, so a consumer cannot read more than the owner granted.
+// Calendar's only view of the board: the declared projection, nothing else.
 export function listDueDates({ state }) {
   const board = readBoardState(state);
   const tasks = sortedTasks(board)
     .filter((task) => task && task.dueAt && !task.archived)
     .map((task) => ({
       task_id: String(task.id),
-      title: String(task.title ?? ""),
+      title: String(task.title || ""),
       due_at: String(task.dueAt),
       completed: task.completed === true,
     }));
   return { operations: [], result: { tasks } };
-}
-
-// Team sharing: a consumer only ever sees the tasks the owner marked as shared,
-// and only the fields listed here. The rest of the board never leaves the
-// Resource, and unsharing takes effect on the next call.
-export function listSharedTasks({ state }) {
-  const board = readBoardState(state);
-  ensureTaskNumbers(board);
-  const tasks = sortedTasks(board)
-    .filter((task) => task && task.shared === true && !task.archived)
-    .map((task) => ({
-      task_id: String(task.id),
-      number: normalizeTaskNumber(task.number),
-      title: String(task.title || ""),
-      status: String(task.columnId || ""),
-      due_at:
-        typeof task.dueAt === "string" && task.dueAt ? String(task.dueAt) : null,
-    }));
-  return { operations: [], result: { tasks } };
-}
-
-export function setTaskSharing({ arguments: args, state }) {
-  const board = readBoardState(state);
-  const at = timestamp(args.at);
-  ensureTaskNumbers(board);
-  const task = resolveTask(board, args.id);
-  if (!task) throw new Error("TODO not found");
-  const shared = args.shared === true;
-  task.shared = shared;
-  if (shared) task.sharedAt = at;
-  else delete task.sharedAt;
-  return commit(board, { task_id: String(task.id), shared }, at);
 }
 
 export function listTodos({ state }) {
@@ -730,11 +696,9 @@ export function initializeBoard({ arguments: args, state }) {
     board.recurrenceOccurrences[key] = id;
     count++;
   }
-  // The operation-scoped adapter requires exactly one `replace` per mutating
-  // operation; a no-op must still commit the (unchanged) board, otherwise a
-  // repeated materialize (e.g. after resuming a workspace) fails with
-  // handler_failed instead of reporting success.
-  return commit(board, { count }, at);
+  return changed || count
+    ? commit(board, { count }, at)
+    : { operations: [], result: { count: 0 } };
 }
 export function moveTodo({ arguments: args, state }) {
   const at = timestamp(args.at),

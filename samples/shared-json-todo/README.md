@@ -1,34 +1,26 @@
 # shared-json-todo
 
-A task board whose board document is **its own**, kept in a Data Resource the
-account owns — so a second app can consume exactly the projection it was
-granted. This is the writing half of the pair; `shared-json-calendar` is the
-operation-only reading half.
+A task board with a personal DataResource and an optional shared DataResource.
+Each member connects their own personal board. Members who have a grant to the
+same shared board can edit it together.
 
-The root `capsule.toml` is `ato.capsule/2` authoring: one Static Web derivation whose Contract requires `GET /` → 200. `ato pack` compiles it into a portable Application bundle.
+The root `capsule.toml` declares the Static Web route with `ato.capsule/1`. Formation checks that `GET /` returns 200 and verifies the workspace digest.
 `fixtures/legacy-store-capsule.toml` preserves the former Store submission
 grammar as a negative Formation fixture; it must fail with
 `legacy_store_manifest` rather than falling back to a Preset.
 
 ## What it declares
 
-`ato.data.toml` (the owner's document Port):
+`ato.data.toml` declares two user-scope operation Ports for `todo.board@1`.
 
-```toml
-schema = "ato.data-ports/1"
+| Port | Board | Operations |
+| --- | --- | --- |
+| `tasks` | Personal (required) | `todo_*`, including the existing projections |
+| `shared_tasks` | Shared (optional) | The 13 `todo_shared_*` board operations |
 
-[[port]]
-name = "tasks"
-protocol = "todo.board@1"
-scope = "user"
-access = "read_write"
-required = true
-```
-
-`ato.operations.yaml` declares the board's operations against that Port with
-`schema: ato.operations/v2` and `state.kind: data_port`. The App's UI calls
-those operations (list, create, update, move, delete, …); the board document is
-the only state, and every commit is applied on the revision just read.
+The UI routes reads and edits to the selected Port. Both use
+`ato.operations/v2` and commit against the DataResource revision read by the
+server. An update sends the board-local task ID and an ISO timestamp in `at`.
 
 The operation **`todo_list_due_dates`** is the only one a calendar needs: it
 reads the document inside the trusted handler and returns just
@@ -41,33 +33,33 @@ limited to `task_id`, `number`, `title`, `status` and `due_at`.
 
 ## Choosing which board this app uses
 
-The board header shows the DataResource this instance is bound to. Clicking it
-lists the boards the person may use — the current board, their personal boards,
-team boards, any other accessible `todo.board@1` Resource — plus **Create a new
-board**. Picking one is an explicit user action that becomes a Binding; the
-platform never chooses a Resource for the app, and the app never reads one it
-was not granted.
+Choose Personal or Shared, then use the board name to open the existing
+DataResource chooser for that Port. The owner can create a separate board for
+Shared. For each collaborator, the owner grants `read`, `write`, and `connect`
+with the shared Port's Operation allowlist. Each collaborator connects that
+Resource under Shared. The personal binding remains independent.
 
 The UI talks to the app-facing Resource bridge (same origin, instance scoped)
 and nothing else:
 
 | Call | Used for |
 | --- | --- |
-| `GET /__ato/data-ports` | the declared port `tasks` and its current binding |
-| `GET /__ato/data-ports/tasks/candidates?access=read` | the boards to offer |
-| `POST /__ato/data-ports/tasks/connect` | binding `{ resource_id, expected_epoch, access }` |
+| `GET /__ato/data-ports` | the two declared Ports and their current bindings |
+| `GET /__ato/data-ports/:port/candidates?access=read` | the boards to offer for the selected Port |
+| `POST /__ato/data-ports/:port/connect` | binding `{ resource_id, expected_epoch, access }` |
 | `POST /__ato/data-resources` | creating a board `{ display_name, document }` |
 
 Behaviour:
 
-- **Bound**: the app reads the board through its own operations
-  (`todo_board` / `todo_list`). Nothing else changes.
-- **Not bound**: the chooser opens by itself. No candidates offers create
-  instead; a single candidate is still confirmed by hand, so the first binding
-  is never implicit.
+- **Bound**: the app reads the selected board through `todo_board` or
+  `todo_shared_board`. The Shared view checks for changes while visible.
+- **Unbound Personal**: the chooser opens on startup. Select a Resource or
+  create a board to connect it.
+- **Unbound or revoked Shared**: the view clears the previous board. Open
+  the chooser to connect a Resource for which you have an active grant.
 - **First read fails**: the board area shows an error with a retry, never an
   empty board — "no tasks" and "could not read" are different states.
-- **Remembered board**: the last selection is kept in `localStorage` under
+- **Remembered personal board**: the last Personal selection is kept in `localStorage` under
   `ato.task-board.resource.v1` as a UI hint only. Every start re-reads
   `GET /__ato/data-ports`; when the binding is gone the chooser opens and the
   hint is only used to say which board is no longer available.
@@ -94,7 +86,7 @@ The tests are DOM-free: `resource-switcher-core.js` holds the bridge client and
 the selection rules, and is evaluated in a Node `vm` sandbox against a stub
 `fetch` (no browser, no dependency install).
 
-## Team sharing (selected tasks only)
+## Selected-task projection
 
 A task carries a `shared` flag that the owner toggles with `todo_set_shared`.
 `todo_list_shared` returns only the shared tasks, and only
@@ -109,9 +101,8 @@ the board, its tasks and its revision stay.
 
 ## What is shared, and what is not
 
-- The Resource document is the authoritative board. There is no local copy to
-  drift; the browser's localStorage is only a fallback when no Resource is
-  connected.
+- In a hosted Instance, each board is loaded from its connected DataResource.
+  The board is cleared when changing Ports or losing access.
 - A second app becomes possible because the shape is written down
   (`schema.jsonc`, and the description saved beside the data), not because the
   platform imposed a type.
@@ -121,9 +112,8 @@ the board, its tasks and its revision stay.
 
 ## Running it
 
-The app uses the runtime's data-ports bridge and instance-operations bridge
-(`window.atoDataPorts` / `window.atoInstanceOperations`), so it runs against the
-hosted runtime and the self-host Coordinator without a document-read bridge.
+The app uses the runtime's Data Port endpoints and instance-operations bridge
+(`window.atoInstanceOperations`).
 Static Web serving is declared by `capsule.toml`; `ato pack`/`ato run` validate
 that route, and data access is admitted separately when a Resource is connected
 and the Port grant is approved.

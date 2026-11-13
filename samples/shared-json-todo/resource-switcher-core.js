@@ -113,7 +113,10 @@
       return request(base + "/" + encodeURIComponent(port) + "/connect", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ...body,
+          access: body.access === "read_write" ? "write" : body.access,
+        }),
       });
     }
 

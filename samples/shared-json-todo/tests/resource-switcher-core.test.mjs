@@ -231,7 +231,7 @@ test("connectBoard: a write binding is used when the server grants it", async ()
   assert.deepEqual(fetchImpl.calls[0].body, {
     resource_id: "dres-a",
     expected_epoch: 4,
-    access: "read_write",
+    access: "write",
   });
 });
 

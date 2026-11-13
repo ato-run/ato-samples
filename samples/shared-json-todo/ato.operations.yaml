@@ -505,9 +505,9 @@ operations:
       access: read
     effects: {external: none}
     expose: {mcp: false, webmcp: false}
-  - id: todo_list_shared
-    title: todo.listShared
-    description: "チーム共有向けの投影。owner が shared にした TODO だけを task_id, number, title, status, due_at に限定して返す"
+  - id: todo_shared_list_due_dates
+    title: todo.shared.listDueDates
+    description: "Calendar projection: only task_id, title, due date and completed for tasks that have a due date."
     semantics: observation
     input:
       type: object
@@ -522,11 +522,10 @@ operations:
             type: object
             properties:
               task_id: {type: string}
-              number: {type: [integer, "null"]}
               title: {type: string}
-              status: {type: string}
-              due_at: {type: [string, "null"]}
-            required: [task_id, number, title, status, due_at]
+              due_at: {type: string}
+              completed: {type: boolean}
+            required: [task_id, title, due_at, completed]
             additionalProperties: false
       required: [tasks]
       additionalProperties: false
@@ -534,6 +533,496 @@ operations:
       kind: state_transform
       use: ato.javascript@1
       module: ./src/operations/todo.js
+      export: listDueDates
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read
+    effects: {external: none}
+    expose: {mcp: true, webmcp: false}
+  - id: todo_shared_list
+    title: todo.shared.list
+    description: "Task Boardに保存されているTODOを一覧取得する。各TODOには #001 形式の通し番号 ref を含む"
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: listTodos
+    semantics: observation
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_shared_get
+    title: todo.shared.get
+    description: "内部IDまたは #023 のような通し番号を指定してTask BoardのTODOを1件取得する"
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+      required:
+        - id
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: getTodo
+    semantics: observation
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_shared_get_by_number
+    title: todo.shared.get_by_number
+    description: TODOの通し番号を指定して詳細を取得する。#023 と言われた場合は number=23 を渡す
+    input:
+      type: object
+      properties:
+        number:
+          type: integer
+          minimum: 1
+      required:
+        - number
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: getTodoByNumber
+    semantics: observation
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_shared_create
+    title: todo.shared.create
+    description: Task Boardに新しいTODOを作成する
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 5000
+        column_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        priority:
+          type: string
+          enum:
+            - none
+            - low
+            - medium
+            - high
+        due_at:
+          type: string
+          maxLength: 32
+        completed:
+          type: boolean
+        subtasks:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                minLength: 1
+                maxLength: 256
+              title:
+                type: string
+                minLength: 1
+                maxLength: 240
+              completed:
+                type: boolean
+              order:
+                type: integer
+                minimum: 0
+            required:
+              - title
+            additionalProperties: false
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - title
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: createTodo
+    semantics: evolution
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_shared_update
+    title: todo.shared.update
+    description: "内部IDまたは #023 のような通し番号を指定してTask BoardのTODOを部分更新する"
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 5000
+        column_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        priority:
+          type: string
+          enum:
+            - none
+            - low
+            - medium
+            - high
+        due_at:
+          type: string
+          maxLength: 32
+        completed:
+          type: boolean
+        archived:
+          type: boolean
+        subtasks:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                minLength: 1
+                maxLength: 256
+              title:
+                type: string
+                minLength: 1
+                maxLength: 240
+              completed:
+                type: boolean
+              order:
+                type: integer
+                minimum: 0
+            required:
+              - title
+            additionalProperties: false
+        recurrence_enabled:
+          type: boolean
+        recurrence_weekday:
+          type: integer
+          minimum: 1
+          maximum: 7
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - id
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: updateTodo
+    semantics: evolution
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: true
+      webmcp: false
+  - id: todo_shared_initialize
+    title: todo.shared.initialize
+    description: todo_initialize
+    input:
+      type: object
+      properties:
+        date:
+          type: string
+          minLength: 10
+          maxLength: 10
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - date
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: initializeBoard
+    semantics: evolution
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_shared_move
+    title: todo.shared.move
+    description: todo_move
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        column_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        target_id:
+          type: string
+          maxLength: 256
+        after:
+          type: boolean
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - id
+        - column_id
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: moveTodo
+    semantics: evolution
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_shared_delete
+    title: todo.shared.delete
+    description: todo_delete
+    input:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - id
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: deleteTodo
+    semantics: evolution
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_shared_archive_done
+    title: todo.shared.archive_done
+    description: todo_archive_done
+    input:
+      type: object
+      properties:
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: archiveDone
+    semantics: evolution
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_shared_reset
+    title: todo.shared.reset
+    description: todo_reset
+    input:
+      type: object
+      properties:
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: resetBoard
+    semantics: evolution
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_shared_replace_board
+    title: todo.shared.replace_board
+    description: todo_replace_board
+    input:
+      type: object
+      properties:
+        board:
+          type: object
+          additionalProperties: true
+        at:
+          type: string
+          minLength: 24
+          maxLength: 24
+      required:
+        - board
+        - at
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: replaceBoard
+    semantics: evolution
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read_write
+    effects:
+      external: none
+    expose:
+      mcp: false
+      webmcp: false
+  - id: todo_shared_board
+    title: todo.shared.board
+    description: "Task Boardの正本ドキュメント全体を返す（TODO画面の描画用）"
+    semantics: observation
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/todo.js
+      export: boardDocument
+    state:
+      kind: data_port
+      port: shared_tasks
+      protocol: todo.board@1
+      access: read
+    effects: {external: none}
+    expose: {mcp: false, webmcp: false}
+  - id: todo_list_shared
+    title: todo.listShared
+    description: "チーム共有向けの投影。owner が shared にした TODO だけを task_id, number, title, status, due_at に限定して返す"
+    semantics: observation
+    input:
+      type: object
+      properties: {}
+      additionalProperties: false
+    # The projection includes nullable fields. v2 only accepts single-type schemas.
+    execution:
+      kind: state_transform
+      use: ato.javascript@1
+      module: ./src/operations/task-sharing.js
       export: listSharedTasks
     state:
       kind: data_port
@@ -573,7 +1062,7 @@ operations:
     execution:
       kind: state_transform
       use: ato.javascript@1
-      module: ./src/operations/todo.js
+      module: ./src/operations/task-sharing.js
       export: setTaskSharing
     state:
       kind: data_port

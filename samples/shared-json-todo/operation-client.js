@@ -1,16 +1,34 @@
 // UI input and display only. Business changes live in src/operations/todo.js.
 let pendingOperation = null;
 let operationBusy = false;
+let activeBoardPort = "tasks";
+let boardReadSequence = 0;
+let boardReadPending = false;
+
+function boardOperation(port, id) {
+  return port === "shared_tasks" ? "todo_shared_" + id.slice("todo_".length) : id;
+}
+
+function changeBoardPort(port) {
+  activeBoardPort = port;
+  boardReadSequence++;
+  boardReadPending = false;
+  pendingRemoteState = null;
+  closeModal();
+  window.__atoBoardDocument = undefined;
+  window.__atoBoardError = "board_loading";
+  window.__atoBoardStatus = "loading";
+  window.__atoBoardReadOnly = true;
+  state = freshState();
+  render();
+}
 // The board's authoritative copy is the DataResource document; the UI keeps a
 // snapshot refreshed through the todo_board observation after every commit.
-// Returns true when the authoritative board was loaded. `not_connected` means
-// the instance has no Resource yet and the legacy local state may be shown; any
-// other failure is surfaced and the stale copy is never presented as the truth.
+// Returns true when the selected Port's board was loaded.
 function boardFailureLabel(code) {
   return "正本を取得できません: " + String(code || "board_unavailable");
 }
-// "unbound" is a first run, not a failure: the in-app chooser takes over and
-// the legacy local board stays usable. Every other failure is an error state.
+// An unbound Personal Port opens the Resource chooser.
 function boardFailureStatus(code) {
   const core = window.AtoTodoResourceCore;
   if (core && typeof core.failureStatus === "function")
@@ -20,14 +38,18 @@ function boardFailureStatus(code) {
     : "error";
 }
 async function refreshBoard() {
+  const port = activeBoardPort;
+  const sequence = ++boardReadSequence;
+  boardReadPending = true;
   try {
     const handle = await atoInstanceOperations.prepare(
-      "todo_board",
+      boardOperation(port, "todo_board"),
       {},
       crypto.randomUUID(),
     );
     const result = await handle.invoke();
-    if (result && result.result && typeof result.result === "object") {
+    if (sequence !== boardReadSequence) return false;
+    if (Array.isArray(result?.result?.columns) && result.result.tasks) {
       window.__atoBoardDocument = result.result;
       delete window.__atoBoardError;
       window.__atoBoardStatus = "bound";
@@ -36,19 +58,23 @@ async function refreshBoard() {
     window.__atoBoardError = "board_unavailable";
     window.__atoBoardStatus = "error";
   } catch (error) {
+    if (sequence !== boardReadSequence) return false;
     const code = error && error.code;
-    if (code === "data_port_not_connected" || code === "data_resource_unavailable") {
-      // Not connected: the legacy local state is the only available view.
+    if (port === "tasks" && boardFailureStatus(code) === "unbound") {
       delete window.__atoBoardError;
       window.__atoBoardStatus = boardFailureStatus(code);
     } else {
       window.__atoBoardError = code || "board_unavailable";
-      window.__atoBoardStatus = boardFailureStatus(window.__atoBoardError);
+      window.__atoBoardStatus = "error";
     }
+  } finally {
+    if (sequence === boardReadSequence) boardReadPending = false;
   }
   // Every outcome repaints: an error panel left over from an earlier attempt
   // must disappear as soon as the state it described is gone.
   window.__atoBoardDocument = undefined;
+  pendingRemoteState = null;
+  if (port === "shared_tasks") closeModal();
   state = loadState();
   render();
   showSync(
@@ -78,6 +104,7 @@ async function runOperation(id, args, onSuccess) {
     toast("このボードは読み取り専用です");
     return null;
   }
+  if (window.__atoBoardStatus !== "bound") return null;
   const signature = JSON.stringify([id, args]);
   if (pendingOperation && pendingOperation.signature !== signature) {
     toast("前の操作の結果を確認してから変更してください");
@@ -86,6 +113,7 @@ async function runOperation(id, args, onSuccess) {
   if (!pendingOperation)
     pendingOperation = {
       id,
+      operation: boardOperation(activeBoardPort, id),
       signature,
       arguments: JSON.parse(JSON.stringify(args)),
       input: {
@@ -107,25 +135,34 @@ async function runOperation(id, args, onSuccess) {
   });
   try {
     intent.handle ??= await atoInstanceOperations.prepare(
-      id,
+      intent.operation,
       intent.input,
       intent.key,
     );
-    const result = await intent.handle.invoke();
-    intent.committed = result;
-    await refreshBoard();
+    if (!intent.committed) {
+      try {
+        intent.committed = await intent.handle.invoke();
+      } catch (error) {
+        if (error.code !== "operation_state_sync_failed" ||
+            error.details?.status !== "succeeded") throw error;
+        intent.committed = error.details;
+      }
+    }
+    const loaded = await refreshBoard();
     state = loadState();
     render();
-    showSync("保存済み");
-    intent.onSuccess?.(result);
+    if (loaded) showSync("保存済み");
+    intent.onSuccess?.(intent.committed);
     pendingOperation = null;
     operationRetry.hidden = true;
     operationRetry.style.display = "none";
-    return result;
+    return intent.committed;
   } catch (error) {
-    const terminal = ["failed", "conflict", "revoked"].includes(
-      error.details?.status,
-    );
+    const terminal =
+      ["failed", "conflict", "revoked"].includes(error.details?.status) ||
+      (error.status >= 400 && error.status < 500 &&
+        ![408, 429].includes(error.status));
+    if (terminal) await refreshBoard();
     if (!intent.handle || terminal) pendingOperation = null;
     if (pendingOperation) {
       if (dom.modalBackdrop.classList.contains("open"))
@@ -159,9 +196,14 @@ async function runOperation(id, args, onSuccess) {
 // board elsewhere (MCP, another tab, a sync event) calls this instead of
 // assuming Browser State is the store.
 window.__atoBoardSync = async () => {
+  if (operationBusy || boardReadPending || touchDrag || dragContext) return false;
+  const previous = window.__atoBoardDocument;
   if (await refreshBoard()) {
-    state = loadState();
-    render();
+    if (JSON.stringify(previous) !== JSON.stringify(window.__atoBoardDocument)) {
+      state = loadState();
+      render();
+      if (editingTaskId && !state.tasks[editingTaskId]) closeModal();
+    }
     return true;
   }
   return false;
@@ -171,6 +213,7 @@ refreshBoard().then((loaded) => {
   if (loaded) {
     state = loadState();
     render();
+    window.AtoRecurrence?.materializeToday();
   }
 });
 
@@ -178,18 +221,13 @@ setTimeout(() => {
   // A sync from a change made elsewhere (MCP, another tab) refreshes the board
   // from the DataResource; the browser-state subscription only covers the
   // legacy storage path.
-  const sync = window.__atoInstanceState?.sync;
-  if (window.__atoInstanceState && typeof sync === "function")
-    window.__atoInstanceState.sync = async (...args) => {
-      const result = await sync.apply(window.__atoInstanceState, args);
-      if (await refreshBoard()) {
-        state = loadState();
-        render();
-      }
-      return result;
-    };
-  window.__atoInstanceState.subscribe(() => {
-    const incoming = loadState();
-    acceptRemoteState(incoming, "ato.run");
-  });
+  window.__atoInstanceState?.subscribe?.(() => window.__atoBoardSync());
 }, 0);
+
+function refreshSharedBoard() {
+  if (activeBoardPort === "shared_tasks" && !document.hidden)
+    window.__atoBoardSync();
+}
+window.addEventListener("focus", refreshSharedBoard);
+document.addEventListener("visibilitychange", refreshSharedBoard);
+setInterval(refreshSharedBoard, 5000);

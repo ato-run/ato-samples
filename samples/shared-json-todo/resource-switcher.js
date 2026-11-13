@@ -8,8 +8,6 @@
 (function installBoardSwitcher() {
   const core = window.AtoTodoResourceCore;
   if (!core) return;
-  // Port name declared in ato.data.toml (protocol todo.board@1).
-  const PORT_NAME = "tasks";
   const BRIDGE = core.createBridge({});
   const MESSAGES = {
     data_binding_conflict:
@@ -22,6 +20,7 @@
 
   const dom = {
     header: document.querySelector(".board-header"),
+    port: document.getElementById("boardPortSelect"),
     button: document.getElementById("boardSwitcherBtn"),
     name: document.getElementById("boardSwitcherName"),
     badge: document.getElementById("boardAccessBadge"),
@@ -31,6 +30,7 @@
   if (!dom.header || !dom.button || !dom.panel || !dom.body) return;
 
   let binding = null;
+  let otherResourceId = null;
   let access = "read_write";
   let view = null;
   let open = false;
@@ -67,6 +67,7 @@
   function degrade(reason) {
     unavailable = true;
     dom.button.disabled = true;
+    dom.port.hidden = true;
     dom.button.title = "この実行環境ではボードを切り替えられません";
     dom.button.classList.add("is-unavailable");
     setHeaderName("Task Board");
@@ -100,7 +101,7 @@
     // or the binding disappeared between the two calls.
     const fresh = await loadRequirements().catch(() => null);
     if (!fresh) return false;
-    const plan = core.startupPlan(fresh, PORT_NAME, null);
+    const plan = core.startupPlan(fresh, activeBoardPort, null);
     if (plan.kind === "bound") {
       binding = plan.binding;
       access = core.accessOf(plan.binding);
@@ -116,21 +117,25 @@
   }
 
   async function applyPlan(payload, options) {
-    const plan = core.startupPlan(payload, PORT_NAME, core.readHint(window.localStorage));
+    const plan = core.startupPlan(payload, activeBoardPort, null);
     if (plan.kind === "error") {
       degrade("data_port_not_declared");
       return;
     }
+    const otherPort = activeBoardPort === "tasks" ? "shared_tasks" : "tasks";
+    otherResourceId =
+      core.bindingOf(core.findPortRequirement(payload, otherPort))?.resource_id ?? null;
     if (plan.kind === "bound") {
       binding = plan.binding;
       access = core.accessOf(plan.binding);
       setHeaderName(plan.binding.display_name || "ボード");
       setBadge();
       // The platform's answer, not the remembered id, is what gets remembered.
-      core.writeHint(window.localStorage, {
-        resource_id: plan.binding.resource_id,
-        display_name: plan.binding.display_name || "",
-      });
+      if (activeBoardPort === "tasks")
+        core.writeHint(window.localStorage, {
+          resource_id: plan.binding.resource_id,
+          display_name: plan.binding.display_name || "",
+        });
       if (options.reload) await reloadBoard();
       return;
     }
@@ -163,6 +168,7 @@
       degrade("data_bridge_unavailable");
       return;
     }
+    dom.port.hidden = !core.findPortRequirement(payload, "shared_tasks");
     await applyPlan(payload, { reload: true, autoOpen: true });
   }
 
@@ -184,8 +190,11 @@
     errorText = "";
     renderPanel();
     try {
-      const payload = await BRIDGE.candidates(PORT_NAME, "read");
-      view = core.chooserView(payload, {
+      const payload = await BRIDGE.candidates(activeBoardPort, "read");
+      const resources = (payload.resources ?? []).filter(
+        (resource) => resource.resource_id !== otherResourceId,
+      );
+      view = core.chooserView({ ...payload, resources }, {
         currentResourceId: binding ? binding.resource_id : "",
         binding: binding,
       });
@@ -301,7 +310,8 @@
       if (!errorText) body.appendChild(note("ボード一覧を取得できませんでした。"));
       return;
     }
-    const hint = core.readHint(window.localStorage);
+    const hint =
+      activeBoardPort === "tasks" ? core.readHint(window.localStorage) : null;
     if (hint && !view.current.length) {
       body.appendChild(
         note(
@@ -327,23 +337,24 @@
   }
 
   async function bindAndLoad(resourceId, expectedEpoch, displayName) {
-    await core.connectBoard(BRIDGE, PORT_NAME, {
+    await core.connectBoard(BRIDGE, activeBoardPort, {
       resourceId: resourceId,
       expectedEpoch: expectedEpoch,
     });
     // What the binding actually got is read back, not assumed from the request.
     const fresh = await BRIDGE.requirements();
-    const plan = core.startupPlan(fresh, PORT_NAME, null);
+    const plan = core.startupPlan(fresh, activeBoardPort, null);
     if (plan.kind !== "bound") throw core.dataBridgeError("data_binding_conflict");
     binding = plan.binding;
     access = core.accessOf(plan.binding);
     window.__atoBoardReadOnly = access === "read";
     setHeaderName(plan.binding.display_name || displayName || "ボード");
     setBadge();
-    core.writeHint(window.localStorage, {
-      resource_id: plan.binding.resource_id,
-      display_name: plan.binding.display_name || displayName || "",
-    });
+    if (activeBoardPort === "tasks")
+      core.writeHint(window.localStorage, {
+        resource_id: plan.binding.resource_id,
+        display_name: plan.binding.display_name || displayName || "",
+      });
     draftName = "";
     const loaded = await reloadBoard();
     if (!loaded) {
@@ -364,7 +375,7 @@
   }
 
   async function selectBoard(entry) {
-    if (!entry || loading) return;
+    if (!entry || loading || pendingOperation || operationBusy) return;
     if (entry.is_current) {
       setOpen(false);
       return;
@@ -383,7 +394,7 @@
   }
 
   async function createBoard(rawName) {
-    if (loading) return;
+    if (loading || pendingOperation || operationBusy) return;
     const displayName = String(rawName || "").trim();
     draftName = displayName;
     if (!displayName) {
@@ -428,6 +439,39 @@
     if (unavailable) return;
     if (open) setOpen(false);
     else openPanel();
+  });
+  dom.port.addEventListener("change", async function () {
+    const nextPort = dom.port.value;
+    if (loading || pendingOperation || operationBusy) {
+      dom.port.value = activeBoardPort;
+      return;
+    }
+    setOpen(false);
+    binding = null;
+    otherResourceId = null;
+    view = null;
+    errorText = "";
+    draftName = "";
+    setHeaderName("");
+    dom.badge.hidden = true;
+    changeBoardPort(nextPort);
+    loading = true;
+    dom.port.disabled = true;
+    dom.button.disabled = true;
+    try {
+      const payload = await loadRequirements();
+      if (!payload) return degrade("data_bridge_unavailable");
+      await applyPlan(payload, { reload: true, autoOpen: false });
+    } catch (error) {
+      errorText = messageFor(error);
+      setOpen(true);
+      await window.__atoBoardSync();
+    } finally {
+      loading = false;
+      dom.port.disabled = false;
+      dom.button.disabled = unavailable;
+      renderPanel();
+    }
   });
   document.addEventListener("click", function (event) {
     if (!open) return;
