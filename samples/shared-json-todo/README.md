@@ -4,7 +4,7 @@ A task board with a personal DataResource and an optional shared DataResource.
 Each member connects their own personal board. Members who have a grant to the
 same shared board can edit it together.
 
-The root `capsule.toml` is `ato.capsule/2` authoring: one Static Web derivation whose Contract requires `GET /` → 200. `ato pack` compiles it into a portable Application bundle.
+The root `capsule.toml` declares the Static Web route with `ato.capsule/1`. Formation checks that `GET /` returns 200 and verifies the workspace digest.
 `fixtures/legacy-store-capsule.toml` preserves the former Store submission
 grammar as a negative Formation fixture; it must fail with
 `legacy_store_manifest` rather than falling back to a Preset.

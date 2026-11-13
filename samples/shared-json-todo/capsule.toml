@@ -1,36 +1,37 @@
-# ato.capsule/2 authoring: one static browser route over the sample tree.
-#
-# The Contract says only what is required to call this app up: its entry page
-# answers GET / with 200 over the declared HTTP Port. Data access is separate
-# from K: the Ports in ato.data.toml and the operations in ato.operations.yaml
-# are admitted at run time by the person's grant.
-schema = "ato.capsule/2"
-
-[application]
-title = "shared-json-todo"
-surface_path = "/"
+schema = "ato.capsule/1"
 
 [[input]]
 id = "workspace"
 use = "ato.workspace@1"
 path = "."
 
-[contract]
-mode = "all"
+[[derive.step]]
+id = "site"
+use = "ato.browser@1"
+op = "serve"
+source = "workspace"
+entry = "index.html"
+spa_fallback = false
 
-[[contract.observation]]
-id = "page"
+[[port]]
+id = "app.http"
+use = "ato.http@1"
+from = "site"
+
+[[contract.require]]
+id = "root"
 use = "ato.contract.http@1"
 port = "app.http"
 method = "GET"
 path = "/"
+
+[contract.require.expect]
 status = 200
 
-[[derivation]]
-id = "web"
-use = "ato.browser@1"
-runtimes = {}
-entry = "index.html"
+[[contract.require]]
+id = "source-identity"
+use = "ato.contract.workspace@1"
+input = "workspace"
 
-[effects]
-default = "pure"
+[contract.require.expect]
+digest = "capture"
