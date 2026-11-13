@@ -69,3 +69,43 @@ A/B の検証用個人タスクは削除済み。B の共有接続は復旧済�
   候補ソースの Formation publish と配備は未実施。
 - API の staging 自動ジョブは課金制限で開始前に終了した。Worker の実測とローカルの
   検証結果は上記のとおり。 [staging ジョブ](https://github.com/ato-run/ato-api/actions/runs/43216228126)
+
+## 2026-11-13 の追試
+
+| 項目 | 確認値 |
+| --- | --- |
+| 候補ソース | `388333528dfdebfd209120fd6aa0bc0e1a9adf2b` |
+| Formation | `fjob_57d011e9544a59133a00e4c1fb032a6e949f2ead56b94f2e072af59c7bed1235` / `succeeded` |
+| 更新後の Schema | `csch_01M79AK1393JCHVR2F8KJBV6S2` |
+| staging API | `e4f76bbde15ad36025fe25c0b30d5ca9eeba7868` / Worker `cbf9b24d-084e-4382-ab28-a3efc4e88bce` 100% |
+| staging PWA | `main-B-vEL2EK.js`（公開と実ブラウザ検証の前後で一致） |
+
+- 既存の `todo.js` を登録時の内容に戻し、選択タスクの投影を別モジュールにした。
+  既存 26 Operation のダイジェストが一致し、Formation 後に新規 2 件も
+  レジストリに登録された。既存 Resource の固定値は変更していない。
+  そのため、登録前からある Resource では、新規 2 Operation は固定値の対象外。
+- [ato-api #1241](https://github.com/ato-run/ato-api/pull/1241) を dev にマージし、
+  [#1243](https://github.com/ato-run/ato-api/pull/1243) で staging に昇格した。
+  同じ Compute に複数 Instance があると元 Schema の照合が 409 になる問題を
+  [#1244](https://github.com/ato-run/ato-api/pull/1244) で修正し、
+  [#1245](https://github.com/ato-run/ato-api/pull/1245) で staging に昇格した。
+  #1244 は型チェックと Update Formation テスト 10 件が成功した。
+  staging 自動デプロイは課金制限で開始しなかったため、lease 付きの手動デプロイで
+  Worker の 100% 配備と health 200 を確認した。
+- PWA の「フォルダーから更新する」で公開し、既存 Instance ID・URL のまま新しい
+  Schema に切り替えた。別の既存 Instance `cinst_01M72JS752NMD7VC5GA70MHB0W`
+  の Schema は `csch_01M72JS2H8DNQFE1MTYPRVNG0H` のまま。新規 Instance の作成や
+  本番への変更は行っていない。
+- 既存 A/B セッションを分離した実 Chrome で、A は 1440 px、B は 390 px で確認した。
+  Schema 更新で失効した Binding は、A/B ともに個人・共有の既存 Resource を
+  ボード選択 UI から接続し直した。4 Binding はすべて新 Schema で active。
+- カードと編集画面で「個人ボード」「共有ボード」を表示した。作成画面でも保存先と
+  共有範囲を確認できた。A が共有タスクを進行中へ移動し、B が元に戻した。
+  双方の画面に反映され、共有 revision は 6 と 7。B の個人用マーカーは A の個人
+  ボードと Shared のどちらにも表示されず、検証後に UI で削除した。
+- A が所有者用 API で B の Grant を取消・再付与した。B の画面から共有カードが消え、
+  個人ボードは表示できた。13 Operation の再付与後、B が共有ボード選択画面から
+  同じ Resource を選び、接続 API が 201 を返して共有タスクが復帰した。
+- 新規認証による A/B の再ログインは未実施。A はパスキー認証が必要で、B は
+  メールを受信できない検証アカウントで登録済みパスキーがない。C の Binding は
+  Schema 更新で失効し、C のセッションでの再承認は未実施。
