@@ -24,6 +24,7 @@ const dom = {
 
   modalBackdrop: document.getElementById("modalBackdrop"),
   modalTitle: document.getElementById("modalTitle"),
+  taskAudience: document.getElementById("taskAudience"),
   closeModal: document.getElementById("closeModalBtn"),
   title: document.getElementById("taskTitleInput"),
   description: document.getElementById("taskDescriptionInput"),
@@ -147,6 +148,7 @@ function normalizeState(input) {
       // Fields owned by the archive and recurrence features survive the
       // normalization; the DataResource document is their only store now.
       archived: !!raw.archived,
+      shared: raw.shared === true,
       recurrenceId: raw.recurrenceId ?? null,
       occurrenceDate: raw.occurrenceDate ?? null,
     };
@@ -413,6 +415,26 @@ function render() {
   installNativeDnD();
 }
 
+function taskVisibility(task) {
+  if (typeof activeBoardPort !== "undefined" && activeBoardPort === "shared_tasks")
+    return {
+      label: "共有ボード",
+      detail: "このボードへのアクセス権を持つ人に表示されます。",
+      shared: true,
+    };
+  if (task?.shared)
+    return {
+      label: "選択共有の対象",
+      detail: "このタスクの概要は、選択共有へのアクセス権を持つ連携先に表示されます。",
+      shared: true,
+    };
+  return {
+    label: "個人ボード",
+    detail: "個人ボードに保存されます。共有ボードには表示されません。",
+    shared: false,
+  };
+}
+
 function renderTaskCard(task) {
   const card = document.createElement("article");
   card.className = "task-card";
@@ -428,7 +450,9 @@ function renderTaskCard(task) {
   const dueTag = task.dueAt
     ? `<span class="tag ${isOverdue(task) ? "overdue" : ""}">Due ${escapeHtml(formatDue(task.dueAt))}</span>`
     : "";
-  card.innerHTML = `<div class="task-topline"><div class="task-title" data-open-task="${escapeAttr(task.id)}"><span class="task-number">${escapeHtml(formatTaskNumber(task.number))}</span>${escapeHtml(task.title)}</div><button class="drag-handle" data-task-handle="${escapeAttr(task.id)}" aria-label="ドラッグして移動">⋮⋮</button></div><div class="task-meta">${priorityTag}${dueTag}${task.completed ? `<span class="tag">Done</span>` : ""}</div>${subCount ? `<div class="sub-progress"><div class="progress-track"><i style="width:${progress}%"></i></div><div class="progress-text">${doneCount}/${subCount}</div></div>` : ""}`;
+  const visibility = taskVisibility(task);
+  const audienceTag = `<span class="tag${visibility.shared ? " tag-shared" : ""}">${visibility.label}</span>`;
+  card.innerHTML = `<div class="task-topline"><div class="task-title" data-open-task="${escapeAttr(task.id)}"><span class="task-number">${escapeHtml(formatTaskNumber(task.number))}</span>${escapeHtml(task.title)}</div><button class="drag-handle" data-task-handle="${escapeAttr(task.id)}" aria-label="ドラッグして移動">⋮⋮</button></div><div class="task-meta">${audienceTag}${priorityTag}${dueTag}${task.completed ? `<span class="tag">Done</span>` : ""}</div>${subCount ? `<div class="sub-progress"><div class="progress-track"><i style="width:${progress}%"></i></div><div class="progress-text">${doneCount}/${subCount}</div></div>` : ""}`;
   return card;
 }
 

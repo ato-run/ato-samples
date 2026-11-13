@@ -84,6 +84,8 @@ function openTaskModal(taskId = null, columnId = "todo") {
   dom.modalTitle.textContent = task
     ? `${formatTaskNumber(task.number)} タスクを編集`
     : "タスクを追加";
+  const visibility = taskVisibility(task);
+  dom.taskAudience.textContent = visibility.label + " · " + visibility.detail;
   dom.title.value = task?.title || "";
   dom.description.value = task?.description || "";
   dom.column.value = task?.columnId || columnId;

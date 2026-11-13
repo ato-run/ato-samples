@@ -22,8 +22,8 @@
 
     <div class="board-header">
       <select id="boardPortSelect" class="control" aria-label="タスクの表示範囲" hidden>
-        <option value="tasks">個人</option>
-        <option value="shared_tasks">共有</option>
+        <option value="tasks">個人タスク</option>
+        <option value="shared_tasks">共有タスク</option>
       </select>
       <button
         id="boardSwitcherBtn"
@@ -73,13 +73,14 @@
   </main>
 
   <div id="modalBackdrop" class="modal-backdrop" role="presentation">
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="taskAudience">
       <div class="modal-head">
         <h2 id="modalTitle">タスク</h2>
         <button id="closeModalBtn" class="close-btn" aria-label="閉じる">×</button>
       </div>
 
       <div class="modal-body">
+        <p id="taskAudience" class="task-audience"></p>
         <div class="field">
           <label for="taskTitleInput">タイトル</label>
           <input id="taskTitleInput" class="control" maxlength="160" placeholder="例: LPを公開する" />

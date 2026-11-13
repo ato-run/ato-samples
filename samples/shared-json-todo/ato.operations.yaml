@@ -1022,7 +1022,7 @@ operations:
     execution:
       kind: state_transform
       use: ato.javascript@1
-      module: ./src/operations/todo.js
+      module: ./src/operations/task-sharing.js
       export: listSharedTasks
     state:
       kind: data_port
@@ -1062,7 +1062,7 @@ operations:
     execution:
       kind: state_transform
       use: ato.javascript@1
-      module: ./src/operations/todo.js
+      module: ./src/operations/task-sharing.js
       export: setTaskSharing
     state:
       kind: data_port
