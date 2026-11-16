@@ -1,0 +1,61 @@
+name: hello Capsule pack and verify
+
+on:
+  pull_request:
+    paths:
+      - "samples/hello/**"
+      - ".github/workflows/hello-capsule.yml"
+  push:
+    branches: [main]
+    paths:
+      - "samples/hello/**"
+      - ".github/workflows/hello-capsule.yml"
+  workflow_dispatch:
+
+jobs:
+  hello:
+    # GitHub's macos-15 standard runner is an Apple M1 (arm64).
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            asset: ato-cli-x86_64-unknown-linux-gnu.tar.xz
+          - runner: macos-15
+            asset: ato-cli-aarch64-apple-darwin.tar.xz
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned released Ato CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=https://github.com/ato-run/ato/releases/download/v0.9.2
+          archive=${{ matrix.asset }}
+          curl -fsSLo "$archive" "$base/$archive"
+          curl -fsSLo "$archive.sha256" "$base/$archive.sha256"
+          if [ "$RUNNER_OS" = macOS ]; then
+            test "$(uname -m)" = arm64
+            shasum -a 256 -c "$archive.sha256"
+          else
+            sha256sum -c "$archive.sha256"
+          fi
+          tar -xJf "$archive"
+          echo "$PWD/${archive%.tar.xz}" >> "$GITHUB_PATH"
+      - name: Pack and verify real Contract observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          ato --version
+          mkdir -p .tmp/hello
+          ato pack samples/hello -o .tmp/hello/hello.capsule
+          ato run .tmp/hello/hello.capsule --no-open \
+            --verification-receipt .tmp/hello/receipt.json
+          python3 - <<'PY'
+          import json
+          with open(".tmp/hello/receipt.json", encoding="utf-8") as file:
+              receipt = json.load(file)
+          assert receipt["fully_satisfied"] is True, receipt
+          print("Hello Capsule: accepted Contract receipt")
+          PY
