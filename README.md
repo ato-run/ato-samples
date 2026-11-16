@@ -68,10 +68,26 @@ The bundle also contains `bundle.json` (`ato.oss-quick-start/1`) with the
 version and capsule names, and `workspace.toml` with the capsule SHA-256 pins.
 Capsules are byte-identical across macOS/Linux/Windows builds.
 
+## Hello Capsule (v0.9.2 preview)
+
+New to Ato? [`samples/hello`](samples/hello/README.md) is a tiny, source-first
+Capsule tutorial: one static browser Derivation, two explicit Contract observations
+and an inspectable Run receipt. No build dependencies or account are required
+for a local run.
+
+```sh
+mkdir -p .tmp/hello
+ato pack samples/hello -o .tmp/hello/hello.capsule
+ato run .tmp/hello/hello.capsule
+```
+
+`ato run capsules/ato/hello` becomes available only after the official Ato
+publisher has published and verified the immutable bundle in Capsule Hub.
 ## Current samples vs historical fixtures
 
 `samples/shared-json-todo`, `samples/shared-json-calendar` and
-`samples/excalidraw` are the **current, working** samples used above. The rest
+`samples/excalidraw` are the **current, working** workspace samples used above.
+`samples/hello` is the current first-run Capsule tutorial. The rest
 of this repository (imported sample capsules, demos and pinned snapshot
 commits) is **historical material**: it is kept because consumers still pin
 those revisions, not as evidence of current CLI compatibility. The legacy
@@ -81,7 +97,7 @@ evidence.
 ## Historical fixtures and pinned snapshots
 
 - `samples/`: historical example and fixture inputs from `sample-capsules`
-  (except the current `shared-json-*` and `excalidraw` directories above).
+  (except the current `hello`, `shared-json-*` and `excalidraw` directories above).
 - `demos/capsule-continuation/`: interactive explanation of a Capsule and its Runs.
 - `fixtures/compute-server/`: a dynamic HTTP fixture.
 - `fixtures/generic-dom/`: an external-origin Browser Capsule fixture.
