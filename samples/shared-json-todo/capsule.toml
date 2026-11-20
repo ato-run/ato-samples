@@ -1,37 +1,35 @@
-schema = "ato.capsule/1"
+# ato.capsule/2 authoring: one static browser route over the sample tree, so
+# `ato pack` can build a portable bundle (Calendar uses the same form). Data
+# access is not part of K: the Ports in ato.data.toml and the operations in
+# ato.operations.yaml are admitted at run time.
+schema = "ato.capsule/2"
+
+[application]
+title = "Task Board"
+surface_path = "/"
 
 [[input]]
 id = "workspace"
 use = "ato.workspace@1"
 path = "."
 
-[[derive.step]]
-id = "site"
-use = "ato.browser@1"
-op = "serve"
-source = "workspace"
-entry = "index.html"
-spa_fallback = false
+[contract]
+mode = "all"
 
-[[port]]
-id = "app.http"
-use = "ato.http@1"
-from = "site"
-
-[[contract.require]]
-id = "root"
+[[contract.observation]]
+id = "page"
 use = "ato.contract.http@1"
 port = "app.http"
 method = "GET"
 path = "/"
-
-[contract.require.expect]
 status = 200
 
-[[contract.require]]
-id = "source-identity"
-use = "ato.contract.workspace@1"
-input = "workspace"
+[[derivation]]
+id = "web"
+use = "ato.browser@1"
+runtimes = {}
+entry = "index.html"
+spa_fallback = false
 
-[contract.require.expect]
-digest = "capture"
+[effects]
+default = "pure"
