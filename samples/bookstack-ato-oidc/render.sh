@@ -4,25 +4,24 @@
 # The app image is CPU-specific and the app URL is the Instance's public
 # origin, so both are parameters instead of being committed here.
 #
-# Usage: ./render.sh APP_IMAGE DB_IMAGE PLATFORM APP_URL > capsule.toml
-#   APP_IMAGE, DB_IMAGE: image ids (sha256:...) or digest-pinned references,
-#                        as printed by build-images.sh
-#   PLATFORM:            the Runner platform, e.g. linux/amd64
-#   APP_URL:             the Instance's public https origin (ends up as
-#                        BookStack's APP_URL)
+# Usage: ./render.sh APP_IMAGE PLATFORM APP_URL > capsule.toml
+#   APP_IMAGE: image id (sha256:...) or a digest-pinned reference, as printed
+#              by build-images.sh
+#   PLATFORM:  the Runner platform, e.g. linux/amd64
+#   APP_URL:   the Instance's public https origin (ends up as BookStack's
+#              APP_URL)
 set -eu
 
 usage() {
-  echo "usage: render.sh APP_IMAGE DB_IMAGE PLATFORM APP_URL > capsule.toml" >&2
+  echo "usage: render.sh APP_IMAGE PLATFORM APP_URL > capsule.toml" >&2
   exit 2
 }
 die() { echo "render.sh: $*" >&2; exit 1; }
 
-[ $# -eq 4 ] || usage
+[ $# -eq 3 ] || usage
 app_image=$1
-db_image=$2
-platform=$3
-app_url=$4
+platform=$2
+app_url=$3
 
 case $platform in
   linux/*) arch=${platform#linux/} ;;
@@ -41,15 +40,13 @@ case $app_url in
 esac
 app_url=${app_url%/}
 
-for image in "$app_image" "$db_image"; do
-  case $image in
-    sha256:*|*@sha256:*) ;;
-    *) die "images must be pinned by digest (sha256:... or repo@sha256:...): $image" ;;
-  esac
-  case $image in
-    *[!A-Za-z0-9._/:@-]*) die "invalid image reference: $image" ;;
-  esac
-done
+case $app_image in
+  sha256:*|*@sha256:*) ;;
+  *) die "APP_IMAGE must be pinned by digest (sha256:... or repo@sha256:...): $app_image" ;;
+esac
+case $app_image in
+  *[!A-Za-z0-9._/:@-]*) die "invalid image reference: $app_image" ;;
+esac
 
 here=$(cd "$(dirname "$0")" >/dev/null && pwd) || exit 1
 template=$here/capsule.toml.in
@@ -61,14 +58,13 @@ escape() { printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'; }
 
 rendered=$(sed \
   -e "s|@APP_IMAGE@|$(escape "$app_image")|g" \
-  -e "s|@DB_IMAGE@|$(escape "$db_image")|g" \
   -e "s|@PLATFORM@|$(escape "$platform")|g" \
   -e "s|@ARCH@|$(escape "$arch")|g" \
   -e "s|@APP_URL@|$(escape "$app_url")|g" \
   "$template")
 
 case $rendered in
-  *"@APP_IMAGE@"*|*"@DB_IMAGE@"*|*"@PLATFORM@"*|*"@ARCH@"*|*"@APP_URL@"*)
+  *"@APP_IMAGE@"*|*"@PLATFORM@"*|*"@ARCH@"*|*"@APP_URL@"*)
     die "a placeholder survived rendering" ;;
 esac
 

@@ -1,11 +1,18 @@
-# BookStack 26.09.3 for the Ato Runner.
+# BookStack 26.09.3 and its MariaDB database, for the Ato Runner.
 #
 # Ato runs a workload's image read-only, without capabilities and as a
 # non-root user. The image is flattened before use (build-images.sh exports
 # and re-imports the filesystem), so it must not declare VOLUME. BookStack's
-# code and vendor/ live here in the image; the Instance's state directory
-# /var/lib/bookstack holds only config and data, because a state checkpoint is
-# limited to 64 MiB.
+# code and vendor/ live here in the image; the Instance's one state directory
+# /var/lib/bookstack holds only config, uploads and the database, because a
+# state checkpoint is limited to 64 MiB.
+#
+# The database is the distribution's mariadb-server (php:8.3-apache is based
+# on Debian 12 "bookworm", which ships MariaDB 10.11). A portable capsule can
+# carry only one filesystem state and no state may be shared by two services,
+# so the app and its database share this image and that one state: start.sh
+# initialises the datadir on first start and runs the server as the container
+# user, listening only on a unix socket under /tmp.
 #
 # The php digest below is php:8.3-apache for linux/amd64. A linux/arm64 Runner
 # needs the arm64 digest of the same tag instead (use
@@ -17,17 +24,31 @@ FROM php@sha256:e520186957084dc0a5baaea83b2ef0c20b16e78c1de31b6fdb21dc1240cce42e
 # already carries dom, xml, mbstring, tokenizer, openssl and iconv; the check
 # at the end fails the build instead of shipping a BookStack that is missing
 # one of them.
+#
+# mariadb-server comes from the distribution. The policy-rc.d stub stops the
+# package's post-install from starting a server during the build (start.sh owns
+# the server at run time), and the datadir, run directory and log directory
+# the package creates are removed: the server must run as the container user
+# (33:33) from the state directory, not from root-owned defaults. The build
+# prints the MariaDB version it installed.
 RUN set -eux; \
+    printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d; \
+    chmod +x /usr/sbin/policy-rc.d; \
     apt-get update; \
-    apt-get install -y --no-install-recommends \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libfreetype6-dev \
         libjpeg62-turbo-dev \
         libpng-dev \
-        libzip-dev; \
-    rm -rf /var/lib/apt/lists/*; \
+        libzip-dev \
+        mariadb-server; \
+    rm -rf /var/lib/apt/lists/* /var/lib/mysql /run/mysqld /var/log/mysql; \
+    rm -f /usr/sbin/policy-rc.d; \
     docker-php-ext-configure gd --with-freetype --with-jpeg; \
     docker-php-ext-install -j"$(nproc)" gd pdo_mysql zip; \
-    php -r 'foreach (["gd", "pdo_mysql", "zip", "dom", "xml", "mbstring", "tokenizer", "openssl", "iconv", "fileinfo", "ctype", "json"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "missing PHP extension: {$extension}\n"); exit(1); } }'
+    php -r 'foreach (["gd", "pdo_mysql", "zip", "dom", "xml", "mbstring", "tokenizer", "openssl", "iconv", "fileinfo", "ctype", "json"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "missing PHP extension: {$extension}\n"); exit(1); } }'; \
+    command -v mariadbd >/dev/null; \
+    command -v mariadb-install-db >/dev/null; \
+    mariadbd --version
 
 # Composer is only needed at build time to install the app's dependencies.
 COPY --from=composer@sha256:50ea4d33fdcde1adb0f045547295faa1548b33872e5f789dae5b02ce2fb5de93 /usr/bin/composer /usr/local/bin/composer
@@ -56,7 +77,8 @@ RUN set -eux; \
 
 # Everything BookStack writes is a symlink into the state directory that
 # start.sh creates on first start: Laravel's storage, the bootstrap cache, the
-# uploads directory and the .env the service rewrites on every start.
+# uploads directory, the .env the service rewrites on every start and the
+# MariaDB datadir (db/, not linked: start.sh owns it under the state mount).
 RUN set -eux; \
     mkdir -p /var/lib/bookstack/storage /var/lib/bookstack/bootstrap-cache /var/lib/bookstack/uploads; \
     rm -rf /var/www/bookstack/storage /var/www/bookstack/bootstrap/cache /var/www/bookstack/public/uploads; \

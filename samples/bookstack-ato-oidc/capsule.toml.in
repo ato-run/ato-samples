@@ -25,7 +25,8 @@ id = "oidc_client_secret"
 protocol = "ato.secret@1"
 required = true
 
-# The password of BookStack's database user; both services get it.
+# The password of BookStack's database user. The database runs in the same
+# container and the same state as the app; the service applies it on start.
 [[binding]]
 id = "db_password"
 protocol = "ato.secret@1"
@@ -35,12 +36,6 @@ required = true
 id = "bookstack"
 use = "ato.state.filesystem@1"
 mount = "/var/lib/bookstack"
-access = "read-write"
-
-[[state]]
-id = "db"
-use = "ato.state.filesystem@1"
-mount = "/var/lib/bookstack-db"
 access = "read-write"
 
 [contract]
@@ -60,19 +55,12 @@ id = "oci-@ARCH@"
 use = "ato.oci@1"
 runtimes = { "oci.platform" = "@PLATFORM@" }
 
-# BookStack's database. It keeps its files in the "db" state directory and is
-# reached from the app service by the service id, "mariadb".
-[[derivation.service]]
-id = "mariadb"
-runtimes = { "oci.image" = "@DB_IMAGE@", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "268435456", "oci.cpu_limit_millis" = "500", "oci.pids_limit" = "128", "oci.entrypoint" = "/bin/sh" }
-argv = ["/app/mariadb-start.sh"]
-ports = [{ id = "db.mysql", guest_port = 3306 }]
-state = ["db"]
-bindings = ["db_password"]
-
+# BookStack and its database in one container and one state: portable capsules
+# support at most one filesystem state, and a state cannot be shared by two
+# services. start.sh starts mariadbd, then Apache, and exits when either stops.
 [[derivation.service]]
 id = "bookstack"
-runtimes = { "oci.image" = "@APP_IMAGE@", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "536870912", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256", "oci.entrypoint" = "/bin/sh" }
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "805306368", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256", "oci.entrypoint" = "/bin/sh" }
 argv = ["/app/start.sh"]
 env = { APACHE_RUN_DIR = "/tmp/apache2/run", APACHE_LOCK_DIR = "/tmp/apache2/lock", APACHE_LOG_DIR = "/tmp/apache2/log", APACHE_PID_FILE = "/tmp/apache2/run/apache2.pid", ATO_OIDC_PUBLIC_ISSUER = "https://selfhost.ato.run/v1/selfhost/oidc", BOOKSTACK_APP_URL = "@APP_URL@" }
 ports = [{ id = "app.http", guest_port = 8080 }]

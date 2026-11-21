@@ -1,14 +1,26 @@
-#!/bin/sh
-# BookStack for Ato. The code is image content (read-only); the Instance's one
-# state directory /var/lib/bookstack holds .env, Laravel's storage, the
-# bootstrap cache, uploads and the OIDC public key. People are signed in with
-# their Ato account through the ato.oidc-issuer@1 Binding; there is no
+#!/bin/bash
+# BookStack and its database for Ato, in one container and one state.
+#
+# The code is image content (read-only). The Instance's one state directory
+# /var/lib/bookstack holds .env, Laravel's storage, the bootstrap cache,
+# uploads, the OIDC public key and MariaDB's datadir (db/). People are signed
+# in with their Ato account through the ato.oidc-issuer@1 Binding; there is no
 # BookStack login form.
+#
+# This script needs bash for the wait -n supervisor at the end. The capsule
+# starts it as "/bin/sh /app/start.sh", so re-exec under bash when sh is the
+# interpreter.
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec /bin/bash "$0" "$@"
+fi
 set -eu
 
 APP_DIR=/var/www/bookstack
 STATE=/var/lib/bookstack
+DATA=$STATE/db
 APACHE_BASE=/tmp/apache2
+SOCKET=/tmp/mysqld.sock
+MYSQL_CNF=/tmp/bookstack-my.cnf
 
 fatal() { echo "bookstack: $*" >&2; exit 1; }
 
@@ -25,8 +37,8 @@ app_url=${ATO_APP_ORIGIN:-${BOOKSTACK_APP_URL:-}}
 [ -n "$app_url" ] || fatal "BOOKSTACK_APP_URL (the Instance's public https origin) is required"
 app_url=${app_url%/}
 
-# State layout, plus the Apache runtime directories (/tmp is the only writable
-# place outside the declared state).
+# State layout, the Apache runtime directories (/tmp is the only writable
+# place outside the declared state) and the database datadir.
 mkdir -p "$STATE/storage/app/public" \
          "$STATE/storage/framework/cache/data" \
          "$STATE/storage/framework/sessions" \
@@ -34,6 +46,7 @@ mkdir -p "$STATE/storage/app/public" \
          "$STATE/storage/logs" \
          "$STATE/bootstrap-cache" \
          "$STATE/uploads" \
+         "$DATA" \
          "$APACHE_BASE/run" "$APACHE_BASE/lock" "$APACHE_BASE/log"
 
 # APP_KEY is generated once and reused; rotating it would drop every session.
@@ -42,7 +55,81 @@ if [ ! -s "$STATE/app_key" ]; then
 fi
 app_key=$(cat "$STATE/app_key")
 
-# Rebuilt on every start: bindings can rotate and the URL can change.
+# A small datadir keeps the state checkpoint (64 MiB limit) plausible: no
+# binlog, no performance schema, a 12 MiB system tablespace and an 8 MiB redo
+# log. The server listens only on the unix socket; the socket and pid file are
+# in /tmp. Someone who outgrows the checkpoint has to export the database
+# instead of relying on in-place updates.
+cat > "$MYSQL_CNF" <<'EOF'
+[mysqld]
+datadir=/var/lib/bookstack/db
+socket=/tmp/mysqld.sock
+pid-file=/tmp/mysqld.pid
+skip-networking
+skip-name-resolve
+character-set-server=utf8mb4
+collation-server=utf8mb4_unicode_ci
+innodb_data_file_path=ibdata1:12M:autoextend
+innodb_log_file_size=8M
+innodb_buffer_pool_size=64M
+performance_schema=OFF
+skip-log-bin
+EOF
+
+db_pid=
+web_pid=
+stop() {
+  trap - INT TERM
+  echo "bookstack: stopping" >&2
+  if [ -n "$db_pid" ]; then
+    kill "$db_pid" 2>/dev/null || true
+  fi
+  if [ -n "$web_pid" ]; then
+    kill "$web_pid" 2>/dev/null || true
+  fi
+  wait 2>/dev/null || true
+  exit 143
+}
+trap stop INT TERM
+
+# The datadir belongs to the container user and is created on first start, so
+# no step needs root.
+if [ ! -d "$DATA/mysql" ]; then
+  echo "bookstack: initialising the database in $DATA" >&2
+  mariadb-install-db --defaults-file="$MYSQL_CNF" --datadir="$DATA" \
+    --auth-root-authentication-method=normal --skip-test-db
+fi
+
+mariadbd --defaults-file="$MYSQL_CNF" &
+db_pid=$!
+
+i=0
+until mariadb-admin --no-defaults --socket="$SOCKET" -uroot ping >/dev/null 2>&1; do
+  if ! kill -0 "$db_pid" 2>/dev/null; then
+    db_pid=
+    fatal "MariaDB exited during start-up"
+  fi
+  i=$((i + 1))
+  [ "$i" -le 60 ] || fatal "MariaDB did not become reachable on $SOCKET"
+  sleep 1
+done
+
+# The database and user are created once, and the password is re-applied on
+# every start so a rotated secret is picked up without touching the datadir.
+# SQL string literals escape backslash and the single quote. The password
+# never appears on a command line.
+db_password=$(printf '%s' "$ATO_BINDING_DB_PASSWORD" | sed -e 's/\\/\\\\/g' -e "s/'/''/g")
+mariadb --no-defaults --socket="$SOCKET" -uroot <<SQL || fatal "cannot prepare the bookstack database"
+CREATE DATABASE IF NOT EXISTS bookstack CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'bookstack'@'localhost' IDENTIFIED BY '${db_password}';
+ALTER USER 'bookstack'@'localhost' IDENTIFIED BY '${db_password}';
+GRANT ALL PRIVILEGES ON bookstack.* TO 'bookstack'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+
+# Rebuilt on every start: bindings can rotate and the URL can change. BookStack
+# reaches the local server through DB_SOCKET (Laravel's unix_socket), so
+# DB_HOST stays localhost and DB_PORT is unset.
 umask 077
 oidc_userinfo=
 if [ "${BOOKSTACK_OIDC_USERINFO_ENDPOINT:-1}" != "0" ]; then
@@ -58,8 +145,8 @@ APP_URL=$app_url
 APP_PROXY=*
 
 DB_CONNECTION=mysql
-DB_HOST=mariadb
-DB_PORT=3306
+DB_HOST=localhost
+DB_SOCKET=/tmp/mysqld.sock
 DB_DATABASE=bookstack
 DB_USERNAME=bookstack
 DB_PASSWORD=$ATO_BINDING_DB_PASSWORD
@@ -145,14 +232,6 @@ while ! write_oidc_key; do
   sleep 2
 done
 
-# The database service starts in parallel with this one.
-i=0
-while ! php -r '$socket = @fsockopen("mariadb", 3306, $errno, $errstr, 2); exit($socket === false ? 1 : 0);'; do
-  i=$((i + 1))
-  [ "$i" -le 120 ] || fatal "MariaDB at mariadb:3306 did not become reachable"
-  sleep 1
-done
-
 # Migrations are idempotent; retry briefly in case the first connection lands
 # while MariaDB is still finishing its own start-up.
 i=0
@@ -163,5 +242,25 @@ while ! ( cd "$APP_DIR" && php artisan migrate --force ); do
   sleep 3
 done
 
+# Apache runs in the background so the container can watch both processes: if
+# either stops, stop the other and exit non-zero, and the Runner restarts the
+# Run instead of serving without a database (or with a database and no app).
+apache2-foreground &
+web_pid=$!
+
 echo "bookstack: serving on $app_url" >&2
-exec apache2-foreground
+
+set +e
+wait -n
+status=$?
+set -e
+
+if kill -0 "$db_pid" 2>/dev/null; then
+  echo "bookstack: Apache stopped; stopping MariaDB" >&2
+else
+  echo "bookstack: MariaDB stopped; stopping Apache" >&2
+fi
+kill "$db_pid" "$web_pid" 2>/dev/null || true
+wait "$db_pid" "$web_pid" 2>/dev/null || true
+[ "$status" -ne 0 ] || status=1
+exit "$status"
