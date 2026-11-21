@@ -1,0 +1,72 @@
+schema = "ato.capsule/2"
+
+[application]
+title = "Nextcloud"
+surface_path = "/status.php"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+# Ato's OpenID Provider, reached through the Runner's issuer relay.
+[[binding]]
+id = "oidc_issuer"
+protocol = "ato.oidc-issuer@1"
+required = true
+
+[[binding]]
+id = "oidc_client_id"
+protocol = "ato.secret@1"
+required = true
+
+[[binding]]
+id = "oidc_client_secret"
+protocol = "ato.secret@1"
+required = true
+
+[[binding]]
+id = "nextcloud_admin_password"
+protocol = "ato.secret@1"
+required = true
+
+[[state]]
+id = "nextcloud"
+use = "ato.state.filesystem@1"
+mount = "/var/lib/nextcloud"
+access = "read-write"
+
+[contract]
+mode = "all"
+
+[[contract.observation]]
+id = "status"
+use = "ato.contract.http@1"
+port = "app.http"
+path = "/status.php"
+status = 200
+
+[[derivation]]
+id = "oci-service-group"
+use = "ato.oci@1"
+runtimes = { "oci.platform" = "linux/arm64" }
+
+# File locking (Nextcloud's recommended Redis use). The session handler stays
+# PHP's own: the image would have to write its php.ini for that.
+[[derivation.service]]
+id = "redis"
+runtimes = { "oci.image" = "localhost/ato-e2e/redis-flat@sha256:b481d35d4055341ee7c9e389bb0734fb634c021fd356e6de539b50e79e99410f", "oci.memory_bytes" = "134217728", "oci.cpu_limit_millis" = "250", "oci.pids_limit" = "64", "oci.entrypoint" = "/usr/local/bin/redis-server" }
+argv = ["--dir", "/tmp", "--save", "", "--appendonly", "no", "--bind", "0.0.0.0", "--protected-mode", "no"]
+ports = [{ id = "redis.tcp", guest_port = 6379 }]
+
+[[derivation.service]]
+id = "nextcloud"
+runtimes = { "oci.image" = "localhost/ato-e2e/nextcloud-split-flat@sha256:faf12dd34a70fece303994f28746563d28b866cde4873171e377724edf8b67bd", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "1073741824", "oci.cpu_limit_millis" = "1500", "oci.pids_limit" = "256", "oci.entrypoint" = "/bin/sh" }
+argv = ["/app/start.sh"]
+env = { NEXTCLOUD_CONFIG_DIR = "/var/lib/nextcloud/config", APACHE_RUN_DIR = "/tmp/apache2/run", APACHE_LOCK_DIR = "/tmp/apache2/lock", APACHE_LOG_DIR = "/tmp/apache2/log", APACHE_PID_FILE = "/tmp/apache2/run/apache2.pid", NEXTCLOUD_TRUSTED_DOMAINS = "*.apps.ato.localhost runner.ato.localhost" }
+ports = [{ id = "app.http", guest_port = 8080 }]
+state = ["nextcloud"]
+bindings = ["oidc_issuer", "oidc_client_id", "oidc_client_secret", "nextcloud_admin_password"]
+
+[effects]
+default = "pure"
