@@ -47,7 +47,7 @@ a board for the app, so the app asks the person, in the header:
 | --- | --- |
 | `GET /__ato/data-ports` | this Port's declaration and its current binding |
 | `GET /__ato/data-ports/tasks/candidates?access=read` | the boards the person may choose |
-| `POST /__ato/data-ports/tasks/connect` | binding `{ resource_id, expected_epoch, access: "operations", operations: ["todo_list_due_dates"] }` |
+| `POST /__ato/data-ports/tasks/connect` | binding `{ resource_id, expected_epoch, access: "read", operations: ["todo_list_due_dates"] }` |
 | `DELETE /__ato/data-ports/tasks/connection` | removing the binding |
 
 Behaviour:

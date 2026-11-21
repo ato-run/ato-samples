@@ -248,7 +248,7 @@ test("connect: binds only the declared operation and reads the events again", as
   assert.deepEqual(connectCall.body, {
     resource_id: "dres-team",
     expected_epoch: 9,
-    access: "operations",
+    access: "read",
     operations: ["todo_list_due_dates"],
   });
   assert.deepEqual(
@@ -296,7 +296,7 @@ test("connect: a stale candidate epoch is refreshed once and the connect is retr
   assert.equal(posts.length, 2);
   assert.equal(posts[0].body.expected_epoch, 4);
   assert.equal(posts[1].body.expected_epoch, 8);
-  assert.equal(posts[1].body.access, "operations");
+  assert.equal(posts[1].body.access, "read");
   assert.deepEqual(posts[1].body.operations, ["todo_list_due_dates"]);
 });
 

@@ -97,12 +97,12 @@
   }
 
   function connectBody(resourceId, epoch, operation) {
-    // Operation-only Port: the connection names only the operation the Port
-    // declares, with the access the Port allows. The bridge forwards both.
+    // Operation-only Port: the connect API takes access "read" or "write";
+    // Calendar only reads, and names the one operation the Port declares.
     return {
       resource_id: resourceId,
       expected_epoch: epoch,
-      access: "operations",
+      access: "read",
       operations: [operation],
     };
   }
