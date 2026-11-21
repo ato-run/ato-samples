@@ -1,0 +1,83 @@
+schema = "ato.capsule/2"
+
+[application]
+title = "BookStack"
+surface_path = "/status"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+# Ato's OpenID Provider, reached through the Runner's issuer relay.
+[[binding]]
+id = "oidc_issuer"
+protocol = "ato.oidc-issuer@1"
+required = true
+
+[[binding]]
+id = "oidc_client_id"
+protocol = "ato.secret@1"
+required = true
+
+[[binding]]
+id = "oidc_client_secret"
+protocol = "ato.secret@1"
+required = true
+
+# The password of BookStack's database user; both services get it.
+[[binding]]
+id = "db_password"
+protocol = "ato.secret@1"
+required = true
+
+[[state]]
+id = "bookstack"
+use = "ato.state.filesystem@1"
+mount = "/var/lib/bookstack"
+access = "read-write"
+
+[[state]]
+id = "db"
+use = "ato.state.filesystem@1"
+mount = "/var/lib/bookstack-db"
+access = "read-write"
+
+[contract]
+mode = "all"
+
+# BookStack's unauthenticated health route. Everything else is behind Ato
+# sign-in, so this is the stable thing to observe.
+[[contract.observation]]
+id = "status"
+use = "ato.contract.http@1"
+port = "app.http"
+path = "/status"
+status = 200
+
+[[derivation]]
+id = "oci-@ARCH@"
+use = "ato.oci@1"
+runtimes = { "oci.platform" = "@PLATFORM@" }
+
+# BookStack's database. It keeps its files in the "db" state directory and is
+# reached from the app service by the service id, "mariadb".
+[[derivation.service]]
+id = "mariadb"
+runtimes = { "oci.image" = "@DB_IMAGE@", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "268435456", "oci.cpu_limit_millis" = "500", "oci.pids_limit" = "128", "oci.entrypoint" = "/bin/sh" }
+argv = ["/app/mariadb-start.sh"]
+ports = [{ id = "db.mysql", guest_port = 3306 }]
+state = ["db"]
+bindings = ["db_password"]
+
+[[derivation.service]]
+id = "bookstack"
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "536870912", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256", "oci.entrypoint" = "/bin/sh" }
+argv = ["/app/start.sh"]
+env = { APACHE_RUN_DIR = "/tmp/apache2/run", APACHE_LOCK_DIR = "/tmp/apache2/lock", APACHE_LOG_DIR = "/tmp/apache2/log", APACHE_PID_FILE = "/tmp/apache2/run/apache2.pid", ATO_OIDC_PUBLIC_ISSUER = "https://selfhost.ato.run/v1/selfhost/oidc", BOOKSTACK_APP_URL = "@APP_URL@" }
+ports = [{ id = "app.http", guest_port = 8080 }]
+state = ["bookstack"]
+bindings = ["oidc_issuer", "oidc_client_id", "oidc_client_secret", "db_password"]
+
+[effects]
+default = "pure"
