@@ -1,10 +1,11 @@
 /**
  * A calendar built from a projection, not from someone else's document.
  *
- * This App owns nothing and reads no board. The Port is operation-only and
- * lists exactly one observation, `todo_list_due_dates`; the owner's grant lists
- * the same one. The projection carries only `task_id`, `title`, `due_at` and
- * `completed`, never descriptions or the rest of the board.
+ * This App owns nothing and reads no board of its own. The Port is
+ * operation-only and lists exactly one observation, `todo_list_due_dates`; the
+ * owner's grant lists the same one. The projection carries only `task_id`,
+ * `title`, `due_at` and `completed`, never descriptions or the rest of the
+ * board.
  *
  * Rendering, date math and view navigation are FullCalendar 7.1.4 (MIT),
  * vendored in `vendor/fullcalendar` so the static Capsule makes no network
@@ -12,8 +13,10 @@
  * sync with the operation result. Narrow panes show one dot per due date;
  * wider panes show the task titles.
  *
- * Failure is never rendered as an empty month: not connected, revoked and
- * unsupported all stop visibly.
+ * Which board it reads is chosen by the person, in the header, and only then is
+ * this Port bound (calendar-switcher.js). Nothing here reads or renders an
+ * empty month in place of a failure: not connected shows the chooser prompt,
+ * revoked and unsupported stop visibly.
  */
 (function () {
   "use strict";
@@ -23,7 +26,6 @@
   var COMPACT_MAX_WIDTH = 520;
   var REFRESH_MS = 4000;
 
-  var where = document.getElementById("where");
   var problem = document.getElementById("problem");
   var empty = document.getElementById("empty");
   var calendarEl = document.getElementById("calendar");
@@ -32,27 +34,20 @@
   var compact = null;
   var refreshTimer = null;
   var hasDueDates = false;
+  // Reads start only after the switcher binds this Port to a board the person
+  // chose; before that the calendar shows its chooser, not a failed read.
+  var connected = false;
 
-  function say(message) {
-    where.textContent = message;
-  }
-
-  function describe(error) {
-    var code = (error && error.code) || "";
-    if (code === "data_port_not_connected")
-      return "This app is not connected to any data yet. Connect it to the same data Todo uses, then reload.";
-    if (code === "data_access_revoked" || code === "data_actor_changed")
-      return "Access to this data changed. Reload to continue.";
-    if (code === "operation_not_granted")
-      return "The data owner has not allowed this app to read due dates. Ask them to grant todo_list_due_dates.";
-    if (code === "unsupported_projection")
-      return "This data is not in a format this app understands, so there is nothing to show. It is still stored, unchanged.";
-    return "Could not read the shared due dates. Try again.";
+  function problemMessage(error) {
+    var core = window.AtoCalendarCore;
+    return core
+      ? core.problemText(error)
+      : "共有された期限を読み取れませんでした。もう一度お試しください。";
   }
 
   function complain(error) {
     problem.hidden = false;
-    problem.textContent = describe(error);
+    problem.textContent = problemMessage(error);
   }
 
   function projectionOf(result) {
@@ -69,7 +64,7 @@
   function toEvent(task) {
     return {
       id: String(task.task_id),
-      title: String(task.title || "(untitled)"),
+      title: String(task.title || "(タイトルなし)"),
       start: task.due_at,
       allDay: true,
       extendedProps: { completed: task.completed === true },
@@ -77,6 +72,10 @@
   }
 
   function fetchEvents(_info, success, failure) {
+    if (!connected) {
+      success([]);
+      return;
+    }
     if (!window.atoDataPorts || !window.atoDataPorts.invoke) {
       failure({ code: "no_runtime" });
       return;
@@ -102,16 +101,12 @@
           .map(toEvent);
         hasDueDates = events.length > 0;
         empty.hidden = hasDueDates;
-        say(
-          "Reading the shared due dates. This app keeps no copy of the board.",
-        );
         success(events);
       })
       .catch(function (error) {
         hasDueDates = false;
         empty.hidden = true;
         if (calendar) calendar.removeAllEvents();
-        say("Your data is not available.");
         complain(error);
         failure(error);
       });
@@ -177,9 +172,34 @@
     buildCalendar();
   }
 
+  /** Bound: read the projection the switcher attached to this Port. */
+  function loadView() {
+    connected = true;
+    problem.hidden = true;
+    empty.hidden = true;
+    if (calendar) calendar.refetchEvents();
+  }
+
+  /** Unbound or access gone: stop showing the previous projection with it. */
+  function clearView() {
+    connected = false;
+    problem.hidden = true;
+    empty.hidden = true;
+    hasDueDates = false;
+    if (calendar) calendar.removeAllEvents();
+  }
+
+  // The switcher owns the connection state; it calls these when the Port is
+  // bound, unbound, or reset underneath a running calendar.
+  window.AtoCalendarView = {
+    load: loadView,
+    clear: clearView,
+  };
+
   function start() {
     if (!window.AtoFullCalendar) {
-      say("This app needs its vendored calendar bundle.");
+      problem.hidden = false;
+      problem.textContent = "このアプリのカレンダー表示を読み込めませんでした。";
       return;
     }
     buildCalendar();
@@ -193,19 +213,9 @@
     });
   }
 
-  /** Access is gone: stop showing the projection with it. */
-  window.addEventListener("ato:data-reset", function (event) {
-    var reason = event && event.detail && event.detail.reason;
-    problem.hidden = true;
-    empty.hidden = true;
-    hasDueDates = false;
-    if (calendar) calendar.removeAllEvents();
-    say(
-      reason === "data_actor_changed"
-        ? "You are signed in as someone else now. Reload to continue."
-        : "Access to this data changed. Reload to continue.",
-    );
-  });
+  // The switcher re-reads the platform after a reset and offers the chooser;
+  // clearing first makes sure the projection stops showing immediately.
+  window.addEventListener("ato:data-reset", clearView);
 
   start();
 })();

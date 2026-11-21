@@ -18,12 +18,170 @@ body {
   gap: 4px;
 }
 .head h1 {
-  margin: 0 0 2px;
+  margin: 0;
   font-size: 16px;
   font-weight: 650;
 }
-.where {
+.head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* Board header: which board this calendar reads. The person chooses it in the
+   app; the platform never picks a Resource for the app. */
+.board-header {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.board-prompt {
   margin: 0;
+  color: #57606a;
+  font-size: 11px;
+}
+.board-switcher {
+  position: relative;
+}
+.board-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(420px, 100%);
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #fff;
+  color: #24292f;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+.board-switcher-btn:hover:not(:disabled) {
+  border-color: #afb8c1;
+}
+.board-switcher-btn:disabled {
+  color: #8c959f;
+}
+.board-switcher-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-switcher-caret {
+  color: #57606a;
+  font-size: 10px;
+}
+.board-switcher-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid #d0d7de;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(36, 41, 47, 0.14);
+}
+.board-switcher-body {
+  display: grid;
+  gap: 6px;
+}
+.board-section {
+  display: grid;
+  gap: 2px;
+}
+.board-section h3 {
+  margin: 2px 0;
+  color: #57606a;
+  font-size: 10px;
+  font-weight: 700;
+}
+.board-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #24292f;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+.board-option:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+.board-option[aria-current="true"] {
+  border-color: #d0d7de;
+  background: #f3f4f6;
+}
+.board-option:disabled {
+  opacity: 0.6;
+}
+.board-option-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-option-badge {
+  flex: none;
+  color: #1a7f37;
+  font-size: 10px;
+  font-weight: 700;
+}
+.board-panel-note {
+  margin: 2px 0;
+  color: #57606a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.board-panel-error {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 6px 8px;
+  border: 1px solid #ffcecb;
+  border-radius: 8px;
+  background: #fff1f0;
+}
+.board-panel-error-text {
+  margin: 0;
+  color: #a40e26;
+  font-size: 11px;
+  font-weight: 650;
+}
+.board-disconnect {
+  border-top: 1px solid #d0d7de;
+  padding-top: 6px;
+}
+.secondary {
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid #d0d7de;
+  border-radius: 7px;
+  background: #fff;
+  color: #24292f;
+  font: inherit;
+  font-size: 11px;
+}
+.secondary:hover:not(:disabled) {
+  border-color: #afb8c1;
+}
+.where {
+  margin: 2px 0 0;
   color: #57606a;
   font-size: 11px;
 }
