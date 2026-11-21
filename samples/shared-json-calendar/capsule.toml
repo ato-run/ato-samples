@@ -7,7 +7,7 @@
 schema = "ato.capsule/2"
 
 [application]
-title = "shared-json-calendar"
+title = "Calendar"
 surface_path = "/"
 
 [[input]]

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,21 +10,52 @@
   <body>
     <main class="app">
       <header class="head">
-        <h1>Calendar</h1>
-        <p class="where" id="where" role="status">
-          Reading the shared due dates. This app keeps no copy of the board.
+        <div class="head-row">
+          <h1>Calendar</h1>
+          <div class="board-header">
+            <p class="board-prompt" id="boardPrompt" role="status" hidden></p>
+            <div class="board-switcher">
+              <button
+                id="boardSwitcherBtn"
+                class="board-switcher-btn"
+                type="button"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="boardSwitcherPanel"
+              >
+                <span id="boardSwitcherName" class="board-switcher-name">読み込み中…</span>
+                <span class="board-switcher-caret" aria-hidden="true">▾</span>
+              </button>
+              <div
+                id="boardSwitcherPanel"
+                class="board-switcher-panel"
+                role="dialog"
+                aria-label="期限を読み取るボードを選択"
+                hidden
+              >
+                <div id="boardSwitcherBody" class="board-switcher-body"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="where" id="where" hidden>
+          共有された期限を読み取っています。このアプリはボードの写しを保存しません。
         </p>
       </header>
 
       <p class="problem" id="problem" role="alert" hidden></p>
-      <p class="empty" id="empty" hidden>No task has a due date yet.</p>
+      <p class="empty" id="empty" hidden>期限のあるタスクはまだありません。</p>
 
       <div class="calendar" id="calendar"></div>
     </main>
 
     <script src="vendor/fullcalendar/fullcalendar.min.js"></script>
-    <!-- app.js calls window.atoDataPorts; the host serves this bridge. -->
+    <!-- app.js calls window.atoDataPorts; the host serves this bridge. The
+         board chooser uses the app-facing Resource bridge (same origin). -->
     <script src="/__ato/data-ports/bridge-v1.js"></script>
+    <script src="resource-switcher-core.js"></script>
+    <script src="calendar-core.js"></script>
     <script src="app.js"></script>
+    <script src="calendar-switcher.js"></script>
   </body>
 </html>
