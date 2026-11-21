@@ -13,6 +13,9 @@ work to verify selected examples against the current contract.
   or unsupported behavior in the historical CLI.
 - `shared-json-todo/`, `shared-json-calendar/`, `react-vite/` and the other
   top-level directories — individual sample applications.
+- [`gitea-ato-headers/`](gitea-ato-headers/) — Gitea 1.27.3 that signs people
+  in with their Ato account through identity headers; build a flat image for
+  the host CPU first (see its README).
 - [`source/`](source/) and [`expectations/`](expectations/) — source-shape
   inputs and expected-output placeholders described in
   [FIXTURE_README.md](FIXTURE_README.md).

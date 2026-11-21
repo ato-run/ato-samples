@@ -1,0 +1,38 @@
+schema = "ato.capsule/2"
+
+[application]
+title = "Gitea"
+surface_path = "/"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+[[state]]
+id = "data"
+use = "ato.state.filesystem@1"
+mount = "/var/lib/gitea"
+access = "read-write"
+
+[contract]
+mode = "all"
+
+[[contract.observation]]
+id = "healthz"
+use = "ato.contract.http@1"
+port = "app.http"
+path = "/api/healthz"
+status = 200
+
+[[derivation]]
+id = "oci-@ARCH@"
+use = "ato.oci@1"
+argv = ["--", "/usr/local/bin/docker-entrypoint.sh"]
+cwd = "."
+guest_port = 3000
+env = { GITEA_APP_INI = "/var/lib/gitea/custom/conf/app.ini", GITEA_WORK_DIR = "/var/lib/gitea", GITEA_CUSTOM = "/var/lib/gitea/custom", GITEA_TEMP = "/tmp/gitea", TMPDIR = "/tmp/gitea", HOME = "/var/lib/gitea/git", GITEA__database__DB_TYPE = "sqlite3", GITEA__database__PATH = "/var/lib/gitea/data/gitea.db", GITEA__server__HTTP_PORT = "3000", GITEA__server__DISABLE_SSH = "true", GITEA__server__START_SSH_SERVER = "false", GITEA__server__OFFLINE_MODE = "true", GITEA__security__INSTALL_LOCK = "true", GITEA__service__DISABLE_REGISTRATION = "true", GITEA__service__ENABLE_REVERSE_PROXY_AUTHENTICATION = "true", GITEA__service__ENABLE_REVERSE_PROXY_AUTO_REGISTRATION = "true", GITEA__service__ENABLE_REVERSE_PROXY_EMAIL = "true", GITEA__security__REVERSE_PROXY_AUTHENTICATION_USER = "X-Ato-Account", GITEA__security__REVERSE_PROXY_AUTHENTICATION_EMAIL = "X-Ato-Email", GITEA__repository__ROOT = "/var/lib/gitea/git/repositories", GITEA__log__MODE = "console", GITEA__mailer__ENABLED = "false", GITEA__ui__SHOW_USER_EMAIL = "false", GITEA__ui__DEFAULT_SHOW_FULL_NAME = "true" }
+runtimes = { "oci.image" = "@IMAGE@", "oci.platform" = "@PLATFORM@", "oci.entrypoint" = "/usr/bin/dumb-init", "oci.workspace_mount" = "/ato/workspace", "oci.memory_bytes" = "536870912", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256" }
+
+[effects]
+default = "pure"
