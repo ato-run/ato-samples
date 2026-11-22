@@ -4,11 +4,15 @@
 # The app image is CPU-specific and the app URL is the Instance's public
 # origin, so both are parameters instead of being committed here.
 #
-# Usage: ./render.sh APP_IMAGE PLATFORM APP_URL > capsule.toml
+# Usage: ./render.sh APP_IMAGE PLATFORM APP_URL [PUBLIC_ISSUER] > capsule.toml
 #   APP_IMAGE: image id (sha256:...) or a digest-pinned reference, as printed
 #              by build-images.sh
 #   PLATFORM:  the Runner platform, e.g. linux/amd64
 #   APP_URL:   the Instance's public https origin (ends up as EspoCRM's siteUrl)
+#   PUBLIC_ISSUER: the installation's public OpenID Provider issuer, default
+#              https://selfhost.ato.run/v1/selfhost/oidc. A different
+#              installation (e.g. the local E2E at https://ato.localhost) passes
+#              https://ato.localhost/v1/selfhost/oidc.
 set -eu
 
 usage() {
@@ -17,10 +21,11 @@ usage() {
 }
 die() { echo "render.sh: $*" >&2; exit 1; }
 
-[ $# -eq 3 ] || usage
+[ $# -eq 3 ] || [ $# -eq 4 ] || usage
 app_image=$1
 platform=$2
 app_url=$3
+public_issuer=${4:-https://selfhost.ato.run/v1/selfhost/oidc}
 
 case $platform in
   linux/*) arch=${platform#linux/} ;;
@@ -38,6 +43,7 @@ case $app_url in
   *' '*) die "APP_URL must not contain spaces: $app_url" ;;
 esac
 app_url=${app_url%/}
+public_issuer=${public_issuer%/}
 
 case $app_image in
   sha256:*|*@sha256:*) ;;
@@ -60,10 +66,11 @@ rendered=$(sed \
   -e "s|@PLATFORM@|$(escape "$platform")|g" \
   -e "s|@ARCH@|$(escape "$arch")|g" \
   -e "s|@APP_URL@|$(escape "$app_url")|g" \
+  -e "s|@PUBLIC_ISSUER@|$(escape "$public_issuer")|g" \
   "$template")
 
 case $rendered in
-  *"@APP_IMAGE@"*|*"@PLATFORM@"*|*"@ARCH@"*|*"@APP_URL@"*)
+  *"@APP_IMAGE@"*|*"@PLATFORM@"*|*"@ARCH@"*|*"@APP_URL@"*|*"@PUBLIC_ISSUER@"*)
     die "a placeholder survived rendering" ;;
 esac
 

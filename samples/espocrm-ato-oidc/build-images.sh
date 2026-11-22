@@ -2,30 +2,39 @@
 # Build the EspoCRM image (EspoCRM plus its MariaDB server) and flatten it into
 # the single-layer, non-root image the Ato Runner accepts.
 #
-# The EspoCRM release is the official espocrm/espocrm image, and the version is
-# fixed below. The digest is not committed because it is per platform and this
-# repository is built on more than one: ESPO_IMAGE must carry the
-# linux/<arch> digest of that version, which makes every build reproducible
-# from the same published image. The digest is resolved from the registry at
-# build time, never from a mutable tag.
+# The release is the official espocrm/espocrm image, pinned to 9.3.11: the
+# version is a constant below and the image is addressed by the digest of that
+# release's manifest list entry for the platform being built. The tag alone is
+# never accepted, and neither is another release's digest, because this sample
+# is verified against this one release (its OIDC implementation and installer
+# are what the sample is written for).
 #
-# Two flattens happen. The first flattens the official image so its VOLUME
-# declarations for data/ and custom/ are gone before Dockerfile replaces those
-# directories with symlinks into the state (a runtime anonymous volume would
-# otherwise hide them and docker export would not carry their content). The
-# second flattens the built image into the one layer the Runner runs: no
-# VOLUME, no ENTRYPOINT, ENV values preserved and quoted (values with spaces
-# would otherwise break docker import), USER 33:33 outside the Runner.
+# The digests are on the manifest list of espocrm/espocrm:9.3.11 (published
+# 2026-10-23):
+#   index (manifest list)          sha256:c66a18906d54a52e5cda40a3b6b36ac8c8c574deba7b29530c2c6b22227c4d86
+#   linux/amd64 image manifest     sha256:7f355480b8be27cc76dfb3eec769bc9f7c3ec968e55208473e8451473e2c54d2
+#   linux/arm64 image manifest     sha256:62d569cb48265575cb79521094fe3f36fda898e8bade7d4b303504e7b5eceb72
+#
+# The image is flattened once, at the end: the official image declares no
+# VOLUME, but the Runner runs a single flattened filesystem read-only as a
+# non-root user. Flattening keeps the base ENV, removes the ENTRYPOINT
+# (start.sh is the entry point) and sets USER 33:33 as the default outside the
+# Runner.
 #
 # Usage:
-#   ESPO_IMAGE=espocrm/espocrm:9.1.5@sha256:<64 hex> ./build-images.sh linux/amd64
-# Prints one image id on stdout: the EspoCRM image.
+#   ESPO_IMAGE=espocrm/espocrm:9.3.11@sha256:<digest for PLATFORM> ./build-images.sh PLATFORM
+# Prints one reference on stdout: the flattened EspoCRM image, in the
+# digest-pinned local form capsule.toml requires
+# (localhost/ato-e2e/espocrm-flat@sha256:...).
 set -euo pipefail
 
-espocrm_version=9.1.5
+espocrm_version=9.3.11
+espocrm_index_digest=sha256:c66a18906d54a52e5cda40a3b6b36ac8c8c574deba7b29530c2c6b22227c4d86
+espocrm_digest_amd64=sha256:7f355480b8be27cc76dfb3eec769bc9f7c3ec968e55208473e8451473e2c54d2
+espocrm_digest_arm64=sha256:62d569cb48265575cb79521094fe3f36fda898e8bade7d4b303504e7b5eceb72
 
 usage() {
-  echo "usage: ESPO_IMAGE=espocrm/espocrm:${espocrm_version}@sha256:<64 hex> build-images.sh PLATFORM" >&2
+  echo "usage: ESPO_IMAGE=espocrm/espocrm:${espocrm_version}@sha256:<digest> build-images.sh PLATFORM" >&2
   exit 2
 }
 die() { echo "build-images.sh: $*" >&2; exit 1; }
@@ -37,23 +46,21 @@ case $platform in
   *) arch=$platform; platform="linux/$arch" ;;
 esac
 case $arch in
-  ''|*[!a-z0-9]*) die "unsupported platform: $platform (e.g. linux/amd64)" ;;
+  amd64) expected_digest=$espocrm_digest_amd64 ;;
+  arm64) expected_digest=$espocrm_digest_arm64 ;;
+  *) die "unsupported platform: $platform (this sample is pinned for linux/amd64 and linux/arm64)" ;;
 esac
 
-[ -n "${ESPO_IMAGE:-}" ] || die "ESPO_IMAGE is required: the official EspoCRM image pinned by digest (espocrm/espocrm:${espocrm_version}@sha256:...)"
+[ -n "${ESPO_IMAGE:-}" ] || die "ESPO_IMAGE is required: espocrm/espocrm:${espocrm_version}@$expected_digest"
 case $ESPO_IMAGE in
   espocrm/espocrm:${espocrm_version}@sha256:*|docker.io/espocrm/espocrm:${espocrm_version}@sha256:*) ;;
   *) die "ESPO_IMAGE must pin espocrm/espocrm:${espocrm_version} by digest, got: $ESPO_IMAGE" ;;
 esac
 digest=${ESPO_IMAGE##*@}
-hex=${digest#sha256:}
-case $hex in
-  ''|*[!0-9a-f]*) die "ESPO_IMAGE digest is not hexadecimal: $digest" ;;
-esac
-[ ${#hex} -eq 64 ] || die "ESPO_IMAGE digest must be 64 hex characters: $digest"
+[ "$digest" = "$expected_digest" ] || die "ESPO_IMAGE digest $digest is not the pinned $platform digest $expected_digest"
+[ "$digest" != "$espocrm_index_digest" ] || die "ESPO_IMAGE names the manifest list; use the $platform image manifest digest"
 
 app_source="espocrm-ato:${espocrm_version}-${arch}"
-flat_base="localhost/ato-e2e/espocrm-base:${espocrm_version}-${arch}"
 flat_app=localhost/ato-e2e/espocrm-flat
 
 here=$(cd "$(dirname "$0")" >/dev/null && pwd) || exit 1
@@ -108,18 +115,15 @@ flatten() {
   flattened=$image_id
 }
 
-echo "build-images.sh: pulling $ESPO_IMAGE for $platform" >&2
+echo "build-images.sh: pulling $ESPO_IMAGE for $platform (EspoCRM $espocrm_version, index $espocrm_index_digest)" >&2
 docker pull --platform "$platform" "$ESPO_IMAGE" >&2
-
-echo "build-images.sh: flattening $ESPO_IMAGE (drops its VOLUME declarations)" >&2
-flatten "$ESPO_IMAGE" 33:33 "$flat_base"
 
 echo "build-images.sh: building $app_source for $platform" >&2
 docker build --platform "$platform" \
-  --build-arg "ESPOCRM_IMAGE=$flat_base" \
+  --build-arg "ESPOCRM_IMAGE=$ESPO_IMAGE" \
   -t "$app_source" "$here/image" >&2
 
 flatten "$app_source" 33:33 "$flat_app"
 
-echo "build-images.sh: built the EspoCRM image for $platform" >&2
-printf '%s\n' "$flattened"
+echo "build-images.sh: built the EspoCRM $espocrm_version image for $platform" >&2
+printf 'localhost/ato-e2e/espocrm-flat@%s\n' "$flattened"
