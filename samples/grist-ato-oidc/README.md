@@ -162,10 +162,11 @@ selfhost share-app-with-org "$INSTANCE" "$ORG"
 - 2 人の Ato ユーザーによる end-to-end の確認（Grist のログインフォームなしの
   サインイン、各自の Grist ユーザー、ドキュメントの作成・読み返し、相手の
   ドキュメントが開けないこと、update 後の残存、organization から外した人の
-  403）は、検証スクリプト側の不具合のため 2026-11-22 の時点では最後まで
-  通せていません。この項目は未確認です。
-- state は停止時で `du` 約 728 KiB、checkpoint が pack する非圧縮 tar で
-  747,520 bytes でした。上限 64 MiB（`MAX_STATE_ARTIFACT_BYTES`）の内側です。
+  403）は、cookie を使い回さずに始めた 1 回の run で最後まで通りました
+  （2026-11-22、Lima VM）。
+- この run 終了時の state は `du` で約 1.6 MiB、checkpoint が pack する
+  非圧縮 tar で 1,617,920 bytes でした。上限 64 MiB
+  （`MAX_STATE_ARTIFACT_BYTES`）の内側です。
 
 ## 制限
 
