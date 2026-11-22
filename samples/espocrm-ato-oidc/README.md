@@ -79,13 +79,12 @@ EspoCRM 9.3.11 をセルフホストの Ato 上で動かすサンプルです。
     します。web installer（`/install`）は image の Apache 設定で HTTP から
     拒否しています。
   - 初回のインストール直後に、datadir を作り直して小さくします。インストーラは
-    138 テーブルを 1 つの長いトランザクションで作り、MariaDB の undo ログが
-    `ibdata1` に残るため、インストール直後の datadir は約 103 MiB（うち
-    `ibdata1` が約 77 MiB）になります。Runner の state checkpoint は非圧縮 tar で
-    64 MiB までなので、そのままでは in-place update の checkpoint が 413 で
-    失敗します。`start.sh` は論理ダンプを取り、datadir を初期化し直して同じ
-    ダンプを戻し、各テーブルを `OPTIMIZE` します（論理データは数百 KiB）。
-    undo は `innodb_undo_tablespaces=2` の独立 tablespace に置き、
+    138 テーブルを 1 つの長いトランザクションで作り、その undo が大きいため、
+    インストール直後の datadir は 100 MiB 前後になります（論理データは数百 KiB）。
+    Runner の state checkpoint は非圧縮 tar で 64 MiB までなので、そのままでは
+    in-place update の checkpoint が 413 で失敗します。`start.sh` は論理ダンプを
+    取り、datadir を初期化し直して同じダンプを戻し、各テーブルを `OPTIMIZE`
+    します。undo は `innodb_undo_tablespaces=2` の独立 tablespace に置き、
     `innodb_undo_log_truncate=ON` で purge 後に縮めます。これでインストール
     直後の state は checkpoint できる大きさになります。EspoCRM が使わない
     MariaDB の help テーブルと統計も引き続き削除します。

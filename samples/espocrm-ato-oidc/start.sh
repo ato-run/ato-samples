@@ -235,14 +235,15 @@ install_espocrm() {
 # Rebuild the datadir from a logical dump once, right after the installation.
 #
 # The installer creates EspoCRM's 138 tables and their metadata in one long
-# transaction and leaves a large undo high-water mark behind: the datadir it
-# writes is ~103 MiB, mostly the system tablespace and undo, while the logical
-# data is a few hundred KiB. The Runner's state checkpoint is an uncompressed
-# tar artifact of at most 64 MiB, so an in-place update of a freshly installed
-# Instance would always fail with checkpoint_failed. Rebuilding the datadir
-# from a dump, with the undo in its own truncatable tablespaces (the my.cnf
-# above), produces the same data in ~60 MiB. The dump is the data the installer
-# wrote; the database user is re-created afterwards and on every later start.
+# transaction and the undo it needs is large: the datadir it writes is around
+# 100 MiB (undo tablespaces, the system tablespace and the 138 per-table
+# files), while the logical data is a few hundred KiB. The Runner's state
+# checkpoint is an uncompressed tar artifact of at most 64 MiB, so an in-place
+# update of a freshly installed Instance would always fail with
+# checkpoint_failed. Rebuilding the datadir from a dump, with the undo in its
+# own truncatable tablespaces (the my.cnf above), produces the same data in
+# ~60 MiB. The dump is the data the installer wrote; the database user is
+# re-created afterwards and on every later start.
 compact_datadir() {
   local dump=$STATE/install-dump.sql
   echo "espocrm: rebuilding the datadir to drop the installer's undo high-water mark" >&2
