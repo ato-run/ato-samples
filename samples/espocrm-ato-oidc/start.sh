@@ -192,7 +192,8 @@ ensure_db_user
 
 # One value for the -d query parameter of install/cli.php. The installer reads
 # it with parse_str, so every value is percent-encoded.
-url_encode() { php -r 'echo rawurlencode($argv[1]);' "$1"; }
+# `--` ends PHP's own options: a generated secret may start with "-".
+url_encode() { php -r 'echo rawurlencode($argv[1]);' -- "$1"; }
 
 # Run one installer step. install/cli.php exits 0 even when the step failed and
 # prints "Error: ...", so the output is what decides success (the official
@@ -379,7 +380,7 @@ api() {
   fi
 }
 json_field() {
-  php -r '$document = json_decode(stream_get_contents(STDIN), true); if (!is_array($document) || !isset($document[$argv[1]])) { exit(1); } echo $document[$argv[1]];' "$1"
+  php -r '$document = json_decode(stream_get_contents(STDIN), true); if (!is_array($document) || !isset($document[$argv[1]])) { exit(1); } echo $document[$argv[1]];' -- "$1"
 }
 
 # The default role and team are made through the admin API on the first start,
