@@ -33,18 +33,59 @@ class AtoRemoteUserBackend(RemoteUserBackend):
         return user
 
 
+# Models whose rows belong to one person (ModelWithOwner, filtered by
+# PermittedObjectsFilter) or hang off one document. Every action is granted.
+OWNED_MODELS = (
+    "correspondent",
+    "tag",
+    "documenttype",
+    "storagepath",
+    "document",
+    "savedview",
+    "savedviewfilterrule",
+    "uisettings",
+    "paperlesstask",
+    "note",
+    "sharelink",
+    "sharelinkbundle",
+    "customfieldinstance",
+)
+# Models that apply to EVERY person's documents and have no owner. A regular
+# account must not hold these: a workflow can assign itself permissions on
+# documents other people add, and deleting a custom field deletes everybody's
+# values in it. Custom fields may still be seen and filled in.
+INSTALLATION_WIDE_CODENAMES = (
+    "add_customfield",
+    "change_customfield",
+    "delete_customfield",
+)
+INSTALLATION_WIDE_MODELS = (
+    "workflow",
+    "workflowtrigger",
+    "workflowaction",
+    "workflowactionemail",
+    "workflowactionwebhook",
+    "workflowrun",
+)
+
+
 def ensure_default_group():
     """Make sure every default group exists with the regular-user permissions.
 
-    The permissions granted are Paperless's own model permissions for the
-    documents app (documents, tags, correspondents, document types, storage
-    paths, saved views, custom fields, notes, share links and tasks). They are
-    idempotent additions: a group an administrator edited later keeps its
-    changes, because nothing is removed.
+    A regular account gets every permission on the models in OWNED_MODELS and
+    may view custom fields. Additions are idempotent and other permissions an
+    administrator gives the group are kept, except the installation-wide ones
+    above, which are taken away again on every start: give those to a separate
+    group instead.
     """
-    regular_user_permissions = Permission.objects.filter(
-        content_type__app_label="documents",
-    )
+    documents = Permission.objects.filter(content_type__app_label="documents")
+    regular_user_permissions = documents.filter(
+        content_type__model__in=OWNED_MODELS,
+    ) | documents.filter(codename="view_customfield")
+    installation_wide = documents.filter(
+        content_type__model__in=INSTALLATION_WIDE_MODELS,
+    ) | documents.filter(codename__in=INSTALLATION_WIDE_CODENAMES)
     for name in settings.ACCOUNT_DEFAULT_GROUPS:
         group, _created = Group.objects.get_or_create(name=name)
         group.permissions.add(*regular_user_permissions)
+        group.permissions.remove(*installation_wide)
