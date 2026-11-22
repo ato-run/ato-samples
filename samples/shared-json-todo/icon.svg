@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9B6BF7"/>
+      <stop offset="1" stop-color="#6D35DA"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EFE8FC"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- board -->
+  <rect x="104" y="96" width="304" height="320" rx="34" fill="url(#paper)"/>
+  <!-- three tasks: two done, one open -->
+  <path d="M146 166 L168 188 L206 148" fill="none" stroke="#6D35DA" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="236" y="158" width="132" height="20" rx="10" fill="#D7C8F6"/>
+  <path d="M146 250 L168 272 L206 232" fill="none" stroke="#6D35DA" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="236" y="242" width="132" height="20" rx="10" fill="#D7C8F6"/>
+  <rect x="148" y="314" width="54" height="54" rx="14" fill="none" stroke="#6D35DA" stroke-width="16"/>
+  <rect x="236" y="331" width="100" height="20" rx="10" fill="#D7C8F6"/>
+</svg>

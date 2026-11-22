@@ -117,3 +117,13 @@ The app uses the runtime's Data Port endpoints and instance-operations bridge
 Static Web serving is declared by `capsule.toml`; `ato pack`/`ato run` validate
 that route, and data access is admitted separately when a Resource is connected
 and the Port grant is approved.
+
+## Library icon
+
+`icon.png` (512×512) is this app's icon in the Library, rendered from
+`icon.svg`. A capsule does not carry its icon yet, so set it once after
+installing. On a self-hosted Ato:
+
+```sh
+selfhost set-app-icon COMPUTE_ID --icon - < icon.png
+```

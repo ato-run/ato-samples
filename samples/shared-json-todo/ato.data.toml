@@ -1,10 +1,13 @@
-# Each Port is bound independently by the signed-in user.
+# Each Port is bound independently by the signed-in user. A self-hosted
+# Coordinator connects `tasks` to the person's own board and `shared_tasks` to
+# the board of the organization the app is shared with, on first use.
 schema = "ato.data-ports/2"
 
 [[port]]
 name = "tasks"
 protocol = "todo.board@1"
 scope = "user"
+provision = "personal"
 access = "operations"
 required = true
 operations = [
@@ -18,6 +21,7 @@ operations = [
 name = "shared_tasks"
 protocol = "todo.board@1"
 scope = "user"
+provision = "organization"
 access = "operations"
 required = false
 operations = [
