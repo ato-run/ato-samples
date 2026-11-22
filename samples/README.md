@@ -11,6 +11,8 @@ work to verify selected examples against the current contract.
 - [`01-capabilities/`](01-capabilities/) — individual capability examples.
 - [`03-limitations/`](03-limitations/) — examples intended to exercise failure
   or unsupported behavior in the historical CLI.
+- [`bookstack-ato-oidc/`](bookstack-ato-oidc/) — BookStack on a self-hosted Ato,
+  signed in with an Ato account through OpenID Connect.
 - `shared-json-todo/`, `shared-json-calendar/`, `react-vite/` and the other
   top-level directories — individual sample applications.
 - [`source/`](source/) and [`expectations/`](expectations/) — source-shape
