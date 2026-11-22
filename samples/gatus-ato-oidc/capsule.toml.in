@@ -1,0 +1,69 @@
+schema = "ato.capsule/2"
+
+[application]
+title = "Gatus"
+# Gatus の画面そのもの。サインインしていないブラウザには SPA のログイン画面
+# （「Login with OIDC」ボタン）を 200 で返すので、surface は "/" です。実際の
+# ダッシュボードは Gatus のセッションが必要です。
+surface_path = "/"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+# Ato の OpenID Provider。Runner が持つ issuer relay（コンテナの gateway 上の
+# plain http）がここに渡ります。Ato はこの network Binding を 1 サービス分の
+# group として宣言した 1 step の OCI route を起動するので、アプリのコンテナは
+# relay を受け取ります（ato-api a250f81c7 以降、ato Runner 68de170 以降）。
+[[binding]]
+id = "oidc_issuer"
+protocol = "ato.oidc-issuer@1"
+required = true
+
+[[binding]]
+id = "oidc_client_id"
+protocol = "ato.secret@1"
+required = true
+
+[[binding]]
+id = "oidc_client_secret"
+protocol = "ato.secret@1"
+required = true
+
+# Gatus の SQLite ストレージ（data.db とその WAL）。監視履歴はここに残り、
+# in-place update でも checkpoint / restore されます。保持件数は Gatus 自身の
+# retention 設定（storage.maximum-number-of-*）で小さく保ちます。
+[[state]]
+id = "gatus"
+use = "ato.state.filesystem@1"
+mount = "/data"
+access = "read-write"
+
+[contract]
+mode = "all"
+
+# Gatus の未認証ヘルスエンドポイント（プロセスが生きていれば 200）。アプリの
+# 画面と statuses API は Gatus のセッション（= Ato のサインイン）を要求するので、
+# 契約の観測はこの health です。
+[[contract.observation]]
+id = "health"
+use = "ato.contract.http@1"
+port = "app.http"
+path = "/health"
+status = 200
+
+# 1 step: Gatus の Go バイナリ（公式 image から取り出したもの）と、起動用の
+# bash/openssl/python3（Debian の実行環境）。oidc_issuer relay はこの 1 サービスの
+# route に与えられます。
+[[derivation]]
+id = "oci-@ARCH@"
+use = "ato.oci@1"
+argv = ["/app/start.sh"]
+cwd = "."
+guest_port = 8080
+env = { GATUS_APP_URL = "@APP_URL@", ATO_OIDC_PUBLIC_ISSUER = "@PUBLIC_ISSUER@" }
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.platform" = "@PLATFORM@", "oci.entrypoint" = "/bin/sh", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "268435456", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "128" }
+
+[effects]
+default = "pure"
