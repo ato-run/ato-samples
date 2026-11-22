@@ -157,14 +157,13 @@ selfhost share-app-with-org "$INSTANCE" "$ORG"
 - 単一 step の OCI route に `ATO_BINDING_OIDC_ISSUER` が注入されること。
   Instance は `/status` の contract を満たして ready になり、`set-app-oidc` の
   redirect origin が Instance の公開 origin と一致すること。
-- 2 人の Ato ユーザーが Grist のログインフォームなしに Ato の OIDC で
- サインインし、自分の Grist ユーザー（表示名は Ato の app account、email は
-  Ato のもの）になり、それぞれドキュメントを作成して読み返せること。相手の
-  ドキュメントは開けないこと。
 - README だけを変えた rebuild への in-place update が state を checkpoint /
-  restore して完了し、2 人のドキュメントが残ること。
-- organization から外した人の、開いていたセッションの次の要求が 403 になり、
-  残った人のセッションはそのまま動くこと。
+  restore して完了すること（`checkpoint_revision_id` が採番されました）。
+- 2 人の Ato ユーザーによる end-to-end の確認（Grist のログインフォームなしの
+  サインイン、各自の Grist ユーザー、ドキュメントの作成・読み返し、相手の
+  ドキュメントが開けないこと、update 後の残存、organization から外した人の
+  403）は、検証スクリプト側の不具合のため 2026-11-22 の時点では最後まで
+  通せていません。この項目は未確認です。
 - state は停止時で `du` 約 728 KiB、checkpoint が pack する非圧縮 tar で
   747,520 bytes でした。上限 64 MiB（`MAX_STATE_ARTIFACT_BYTES`）の内側です。
 
