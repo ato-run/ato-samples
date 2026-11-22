@@ -1,0 +1,64 @@
+schema = "ato.capsule/2"
+
+[application]
+title = "Paperless-ngx"
+surface_path = "/accounts/login/"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+# Django's SECRET_KEY. It must survive restarts (sessions and password reset
+# tokens are signed with it) and it must not be committed, so it is a secret
+# Binding: start.sh maps ATO_BINDING_SECRET_KEY to PAPERLESS_SECRET_KEY.
+[[binding]]
+id = "secret_key"
+protocol = "ato.secret@1"
+required = true
+
+# Paperless's database, index, media and the Celery beat schedule.
+[[state]]
+id = "data"
+use = "ato.state.filesystem@1"
+mount = "/var/lib/paperless"
+access = "read-write"
+
+[contract]
+mode = "all"
+
+# The sign-in page is the one route that answers without an Ato sign-in, so it
+# is the stable thing to observe. Everything else is reached through Ato, which
+# forwards the person's app account in X-Ato-Account.
+[[contract.observation]]
+id = "login-page"
+use = "ato.contract.http@1"
+port = "app.http"
+path = "/accounts/login/"
+status = 200
+
+# Two services: Redis (no state) and Paperless-ngx (the one filesystem state).
+# start.sh runs migrations, the web server, the Celery worker and the scheduler
+# in the paperless container, and stops all of them if one stops.
+[[derivation]]
+id = "oci-@ARCH@"
+use = "ato.oci@1"
+runtimes = { "oci.platform" = "@PLATFORM@" }
+
+[[derivation.service]]
+id = "redis"
+argv = ["--dir", "/tmp", "--save", "", "--appendonly", "no", "--bind", "0.0.0.0", "--protected-mode", "no"]
+ports = [{ id = "redis.tcp", guest_port = 6379 }]
+runtimes = { "oci.image" = "@REDIS_IMAGE@", "oci.memory_bytes" = "134217728", "oci.cpu_limit_millis" = "250", "oci.pids_limit" = "64", "oci.entrypoint" = "/usr/local/bin/redis-server" }
+
+[[derivation.service]]
+id = "paperless"
+bindings = ["secret_key"]
+argv = ["/app/start.sh"]
+env = { PAPERLESS_DATA_DIR = "/var/lib/paperless/data", PAPERLESS_MEDIA_ROOT = "/var/lib/paperless/media", PAPERLESS_CONSUMPTION_DIR = "/var/lib/paperless/consume", PAPERLESS_EXPORT_DIR = "/var/lib/paperless/export", PAPERLESS_REDIS = "redis://redis:6379/0", PAPERLESS_ENABLE_HTTP_REMOTE_USER = "true", PAPERLESS_ENABLE_HTTP_REMOTE_USER_API = "true", PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME = "HTTP_X_ATO_ACCOUNT", PAPERLESS_ACCOUNT_DEFAULT_GROUPS = "Ato", PAPERLESS_ENABLE_NLTK = "false", DJANGO_SETTINGS_MODULE = "ato_paperless.settings", PYTHONPATH = "/app", PYTHONDONTWRITEBYTECODE = "1", HOME = "/tmp", TMPDIR = "/tmp" }
+ports = [{ id = "app.http", guest_port = 8000 }]
+state = ["data"]
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "1610612736", "oci.cpu_limit_millis" = "1500", "oci.pids_limit" = "512", "oci.entrypoint" = "/bin/bash" }
+
+[effects]
+default = "pure"
