@@ -1,0 +1,54 @@
+schema = "ato.capsule/2"
+
+[application]
+title = "TriliumNext"
+# The app root. Trilium answers it with its single-page application without asking
+# for a sign-in: its own login is turned off and Ato's gateway is the only gate.
+# The unauthenticated route the Runner checks is the server's own health route
+# below; the note API needs no session either, but it is not a page.
+surface_path = "/"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+# Trilium's data directory: document.db (SQLite), config.ini, the backup directory
+# and the session secret. The code stays in the image (read-only); logs, temporary
+# files and caches are moved to /tmp by start.sh, so the state is only the notes
+# and what belongs to them.
+[[state]]
+id = "trilium"
+use = "ato.state.filesystem@1"
+mount = "/var/lib/trilium"
+access = "read-write"
+
+[contract]
+mode = "all"
+
+# Trilium's own health route. It is answered by the server itself, without a
+# sign-in, and is the same probe the upstream image's HEALTHCHECK uses. The
+# application pages and the note API answer without a session too (the app's login
+# is off); this route proves the server is up before it touches the document.
+[[contract.observation]]
+id = "health"
+use = "ato.contract.http@1"
+port = "app.http"
+path = "/api/health-check"
+status = 200
+
+# One step: TriliumNext's Node server (/usr/src/app/main.mjs), which serves the
+# single-page app, its HTTP API and the WebSocket notifications in one process.
+# The image's own CMD (start-docker.sh, which runs as root) is dropped by
+# build-images.sh; this workspace is mounted at /app because the image's
+# application code is /usr/src/app.
+[[derivation]]
+id = "oci-@ARCH@"
+use = "ato.oci@1"
+argv = ["/app/start.sh"]
+cwd = "."
+guest_port = 8080
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.platform" = "@PLATFORM@", "oci.entrypoint" = "/bin/sh", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "1073741824", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256" }
+
+[effects]
+default = "pure"
