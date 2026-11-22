@@ -1,0 +1,76 @@
+schema = "ato.capsule/2"
+
+[application]
+title = "Grist"
+# The path the Ato surfaces open and the Runner verifies without a session.
+# Grist's own pages start the OIDC sign-in redirect, so the unauthenticated
+# health route is the surface.
+surface_path = "/status"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+# Ato's OpenID Provider, reached through the Runner's issuer relay. Ato launches
+# a single-step OCI route that declares this network Binding as a group of one
+# service, so the application container receives the relay (ato-api a250f81c7
+# or later, ato Runner 68de170 or later).
+[[binding]]
+id = "oidc_issuer"
+protocol = "ato.oidc-issuer@1"
+required = true
+
+[[binding]]
+id = "oidc_client_id"
+protocol = "ato.secret@1"
+required = true
+
+[[binding]]
+id = "oidc_client_secret"
+protocol = "ato.secret@1"
+required = true
+
+# The secret Grist signs its session cookies with. A rotated value signs every
+# person out of the Instance; start.sh re-applies it on every start.
+[[binding]]
+id = "session_secret"
+protocol = "ato.secret@1"
+required = true
+
+# Grist's persist directory: the home database (SQLite) and the documents.
+# The code stays in the image; nothing outside /persist is written.
+[[state]]
+id = "grist"
+use = "ato.state.filesystem@1"
+mount = "/persist"
+access = "read-write"
+
+[contract]
+mode = "all"
+
+# Grist's health route. It is answered by the server itself, without a sign-in,
+# and before the home database or a document is touched. Every application page
+# either starts the sign-in redirect to Ato or needs a Grist session.
+[[contract.observation]]
+id = "status"
+use = "ato.contract.http@1"
+port = "app.http"
+path = "/status"
+status = 200
+
+# One step: Grist's Node server, which serves both the home API and the
+# documents (GRIST_SERVE_SAME_ORIGIN). The Runner gives the oidc_issuer relay to
+# the one service of the route; the Coordinator launches a single-step route
+# that declares the network Binding as a group of one service.
+[[derivation]]
+id = "oci-@ARCH@"
+use = "ato.oci@1"
+argv = ["/app/start.sh"]
+cwd = "."
+guest_port = 8484
+env = { GRIST_APP_URL = "@APP_URL@", ATO_OIDC_PUBLIC_ISSUER = "@PUBLIC_ISSUER@" }
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.platform" = "@PLATFORM@", "oci.entrypoint" = "/bin/sh", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "1073741824", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256" }
+
+[effects]
+default = "pure"
