@@ -1,0 +1,62 @@
+schema = "ato.capsule/2"
+
+[application]
+title = "Uptime Kuma"
+# The dashboard. "/" is only a redirect to /dashboard in Uptime Kuma, so the
+# surface and the contract observation use the real page path. It is answered by
+# the app itself without a sign-in: Uptime Kuma's own login is disabled and Ato's
+# gateway is the only way in.
+surface_path = "/dashboard"
+
+[[input]]
+id = "workspace"
+use = "ato.workspace@1"
+path = "."
+
+# The first admin's password. Uptime Kuma 2.5.12 creates its first admin through
+# the browser setup page; start.sh does it non-interactively from this Binding
+# before the server starts (see database-init.js). The password never lives in
+# the capsule or in the state: the account exists only so the app has an admin
+# row, and Uptime Kuma's own auth is then disabled (the Ato gateway is the gate).
+[[binding]]
+id = "admin_password"
+protocol = "ato.secret@1"
+required = true
+
+# Uptime Kuma's data directory: SQLite (kuma.db), uploads/screenshots, error.log
+# and db-config.json. SQLite, never the embedded MariaDB: the state stays small
+# and is one filesystem state. The code stays in the image (read-only).
+[[state]]
+id = "data"
+use = "ato.state.filesystem@1"
+mount = "/data"
+access = "read-write"
+
+[contract]
+mode = "all"
+
+# The dashboard page. Uptime Kuma answers "/" with a 302 to /dashboard (it is
+# only the entry route), and /dashboard with its index.html, without a sign-in
+# (the login form is not shown when auth is disabled). This is the one check the
+# Runner makes.
+[[contract.observation]]
+id = "dashboard"
+use = "ato.contract.http@1"
+port = "app.http"
+path = "/dashboard"
+status = 200
+
+# One step: Uptime Kuma's Node server (server/server.js), which serves the built
+# client, the Socket.IO API and the monitors in one process. The image's own
+# ENTRYPOINT (dumb-init) is dropped by build-images.sh; this workspace is
+# mounted at /workspace because the image's application code is /app.
+[[derivation]]
+id = "oci-@ARCH@"
+use = "ato.oci@1"
+argv = ["/workspace/start.sh"]
+cwd = "."
+guest_port = 3001
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.platform" = "@PLATFORM@", "oci.entrypoint" = "/bin/bash", "oci.workspace_mount" = "/workspace", "oci.memory_bytes" = "1073741824", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256" }
+
+[effects]
+default = "pure"
