@@ -115,7 +115,13 @@ collation-server=utf8mb4_unicode_ci
 innodb_data_file_path=ibdata1:12M:autoextend
 innodb_log_file_size=4M
 innodb_buffer_pool_size=128M
-innodb_undo_tablespaces=0
+# Undo lives in its own tablespaces instead of ibdata1 so the purge thread can
+# return it after a burst of DDL and inserts. The installer's initial schema
+# build otherwise leaves a ~77 MiB undo high-water mark inside ibdata1, and the
+# state would sit above the Runner's 64 MiB state-artifact limit forever.
+innodb_undo_tablespaces=2
+innodb_undo_log_truncate=ON
+innodb_max_undo_log_size=16M
 innodb_temp_data_file_path=ibtmp1:5M:autoextend
 performance_schema=OFF
 skip-log-bin
@@ -141,26 +147,35 @@ stop() {
 }
 trap stop INT TERM
 
-mariadbd --defaults-file="$MYSQL_CNF" &
-db_pid=$!
+# Start the server and wait for the loopback socket. The datadir rebuild below
+# stops and starts MariaDB a second time, so both places use this.
+wait_for_db() {
+  i=0
+  until mariadb-admin --no-defaults --socket="$SOCKET" -uroot ping >/dev/null 2>&1; do
+    if ! kill -0 "$db_pid" 2>/dev/null; then
+      db_pid=
+      fatal "MariaDB exited during start-up"
+    fi
+    i=$((i + 1))
+    [ "$i" -le 90 ] || fatal "MariaDB did not become reachable on $SOCKET"
+    sleep 1
+  done
+}
 
-i=0
-until mariadb-admin --no-defaults --socket="$SOCKET" -uroot ping >/dev/null 2>&1; do
-  if ! kill -0 "$db_pid" 2>/dev/null; then
-    db_pid=
-    fatal "MariaDB exited during start-up"
-  fi
-  i=$((i + 1))
-  [ "$i" -le 90 ] || fatal "MariaDB did not become reachable on $SOCKET"
-  sleep 1
-done
+start_mariadb() {
+  mariadbd --defaults-file="$MYSQL_CNF" &
+  db_pid=$!
+  wait_for_db
+}
 
 # The database and user are created once, and the password is re-applied on
 # every start so a rotated binding is picked up without touching the datadir.
 # SQL string literals escape backslash and the single quote. The password never
-# appears on a command line.
-db_password=$(printf '%s' "$ATO_BINDING_DB_PASSWORD" | sed -e 's/\\/\\\\/g' -e "s/'/''/g")
-mariadb --no-defaults --socket="$SOCKET" -uroot <<SQL || fatal "cannot prepare the espocrm database"
+# appears on a command line. It runs again after compact_datadir rebuilt the
+# datadir, because the fresh system tables have no application user yet.
+ensure_db_user() {
+  db_password=$(printf '%s' "$ATO_BINDING_DB_PASSWORD" | sed -e 's/\\/\\\\/g' -e "s/'/''/g")
+  mariadb --no-defaults --socket="$SOCKET" -uroot <<SQL || fatal "cannot prepare the espocrm database"
 CREATE DATABASE IF NOT EXISTS espocrm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS 'espocrm'@'127.0.0.1' IDENTIFIED BY '${db_password}';
 CREATE USER IF NOT EXISTS 'espocrm'@'localhost' IDENTIFIED BY '${db_password}';
@@ -170,6 +185,10 @@ GRANT ALL PRIVILEGES ON espocrm.* TO 'espocrm'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON espocrm.* TO 'espocrm'@'localhost';
 FLUSH PRIVILEGES;
 SQL
+}
+
+start_mariadb
+ensure_db_user
 
 # One value for the -d query parameter of install/cli.php. The installer reads
 # it with parse_str, so every value is percent-encoded.
@@ -213,14 +232,76 @@ install_espocrm() {
   echo "espocrm: installation finished" >&2
 }
 
+# Rebuild the datadir from a logical dump once, right after the installation.
+#
+# The installer creates EspoCRM's 138 tables and their metadata in one long
+# transaction and leaves a large undo high-water mark behind: the datadir it
+# writes is ~103 MiB, mostly the system tablespace and undo, while the logical
+# data is a few hundred KiB. The Runner's state checkpoint is an uncompressed
+# tar artifact of at most 64 MiB, so an in-place update of a freshly installed
+# Instance would always fail with checkpoint_failed. Rebuilding the datadir
+# from a dump, with the undo in its own truncatable tablespaces (the my.cnf
+# above), produces the same data in ~60 MiB. The dump is the data the installer
+# wrote; the database user is re-created afterwards and on every later start.
+compact_datadir() {
+  local dump=$STATE/install-dump.sql
+  echo "espocrm: rebuilding the datadir to drop the installer's undo high-water mark" >&2
+  (
+    umask 077
+    mariadb-dump --no-defaults --socket="$SOCKET" -uroot \
+      --single-transaction --quick --routines --triggers --events \
+      --databases espocrm > "$dump"
+  ) || fatal "cannot dump the installed database"
+  mariadb-admin --no-defaults --socket="$SOCKET" -uroot shutdown \
+    || fatal "cannot stop MariaDB for the datadir rebuild"
+  wait "$db_pid" 2>/dev/null || true
+  db_pid=
+  rm -rf "$DB"
+  mkdir -p "$DB"
+  mariadb-install-db --defaults-file="$MYSQL_CNF" --datadir="$DB" \
+    --auth-root-authentication-method=normal --skip-test-db >&2 \
+    || fatal "cannot initialise the rebuilt datadir"
+  start_mariadb
+  mariadb --no-defaults --socket="$SOCKET" -uroot < "$dump" \
+    || fatal "cannot import the installed database"
+  rm -f "$dump"
+  # The installer leaves free space in each of the 138 tables; with one file
+  # per table that is several MiB of the checkpoint budget. Rebuilding the
+  # tables returns it, and the tables are tiny, so this takes a few seconds.
+  for table in $(mariadb --no-defaults --socket="$SOCKET" -uroot -N -B \
+    -e "SELECT table_name FROM information_schema.tables WHERE table_schema = 'espocrm' AND engine = 'InnoDB'"); do
+    mariadb --no-defaults --socket="$SOCKET" -uroot \
+      -e "OPTIMIZE TABLE espocrm.$table" >/dev/null 2>&1 || true
+  done
+  # The import is a burst of DDL and inserts. The purge thread truncates the
+  # undo tablespaces back to their 10 MiB size once its transactions are gone;
+  # wait for that, because the state is checkpointed as-is and the whole
+  # Instance must stay under the artifact limit.
+  i=0
+  while :; do
+    undo_bytes=$(stat -c %s "$DB"/undo* 2>/dev/null | awk '{sum += $1} END {print sum + 0}')
+    [ "${undo_bytes:-0}" -le 25165824 ] && break
+    [ "$i" -lt 30 ] || break
+    i=$((i + 1))
+    sleep 1
+  done
+  ensure_db_user
+}
+
 if [ ! -f "$INSTALL_MARKER" ]; then
   install_espocrm
 fi
+# A state from an older bundle has the install marker but not this one, so the
+# first start of an existing Instance also gets the small datadir.
+if [ ! -f "$STATE/datadir-compacted" ]; then
+  compact_datadir
+  : > "$STATE/datadir-compacted"
+fi
 
 # MariaDB's own help tables and the statistics it fills while EspoCRM's 138
-# tables are created are not read by the application and are a large part of
-# the initial datadir. They are removed once, so the state stays close to the
-# 64 MiB checkpoint; OPTIMIZE is what returns the space to the filesystem.
+# tables are created are not read by the application. They are removed once,
+# so the rebuilt datadir stays well inside the 64 MiB checkpoint; OPTIMIZE is
+# what returns the space to the filesystem.
 if [ ! -f "$STATE/server-data-pruned" ]; then
   mariadb --no-defaults --socket="$SOCKET" -uroot <<'SQL' || true
 DROP TABLE IF EXISTS mysql.help_topic, mysql.help_category, mysql.help_relation,

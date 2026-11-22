@@ -40,15 +40,14 @@ EspoCRM 9.3.11 をセルフホストの Ato 上で動かすサンプルです。
 - `oidc_client_id`・`oidc_client_secret`・`db_password`・
   `admin_password` は import 時に渡す secret Binding です。capsule には
   何も secret を書きません。
-- capsule は 2 サービスの OCI service group です。Runner が
-  `ato.oidc-issuer@1` の relay を与えるのは service group のサービスに対して
-  だけで、1 step の route には relay が注入されません（VM フェーズで
-  `ATO_BINDING_OIDC_ISSUER` が無いことを実測しました）。service group は
-  2〜4 サービス必要なので、EspoCRM のコンテナ（`espocrm`）と、同じ image で
-  PHP の built-in server を 9999 番で動かすだけの `keepalive` を並べています。
-  `keepalive` は Binding も state も持たず、EspoCRM からは何も接続しません。
-  Runner は service group の全サービスが Port を受け付けるまで起動完了と
-  みなすため、この待ち受けだけが目的です。
+- capsule は 1 step の OCI derivation です（`oci_service_group` ではあり
+  ません）。Runner は relay をサービスごとに与えるので、Ato は network
+  Binding を宣言した 1 step の route を 1 サービスの group として起動し、
+  そのサービスに `ATO_BINDING_OIDC_ISSUER` を渡します。この動きには
+  Coordinator（API）`a250f81c7` 以降（ato-api の `d614cc2aa` と `1abbe9b20`
+  を含む）と Runner `68de170` 以降（ato#1931）が必要です。それより古い Ato
+  では 1 step の route に relay が注入されないため、このサンプルは
+  サインインできません。
 - EspoCRM とその MariaDB は **1 つのコンテナ** で動きます。portable な
   capsule は filesystem state を 1 つしか持てず、1 つの state を 2 つの
   サービスで共有することもできません。DB を別サービスにすると state を
@@ -79,8 +78,17 @@ EspoCRM 9.3.11 をセルフホストの Ato 上で動かすサンプルです。
     `saveSettings` → `buildDatabase` → `createUser` → `finish`）を実行
     します。web installer（`/install`）は image の Apache 設定で HTTP から
     拒否しています。
-  - 初回のインストール直後に、EspoCRM が使わない MariaDB の help テーブルと
-    統計を削除し、datadir を小さくします。
+  - 初回のインストール直後に、datadir を作り直して小さくします。インストーラは
+    138 テーブルを 1 つの長いトランザクションで作り、MariaDB の undo ログが
+    `ibdata1` に残るため、インストール直後の datadir は約 103 MiB（うち
+    `ibdata1` が約 77 MiB）になります。Runner の state checkpoint は非圧縮 tar で
+    64 MiB までなので、そのままでは in-place update の checkpoint が 413 で
+    失敗します。`start.sh` は論理ダンプを取り、datadir を初期化し直して同じ
+    ダンプを戻し、各テーブルを `OPTIMIZE` します（論理データは数百 KiB）。
+    undo は `innodb_undo_tablespaces=2` の独立 tablespace に置き、
+    `innodb_undo_log_truncate=ON` で purge 後に縮めます。これでインストール
+    直後の state は checkpoint できる大きさになります。EspoCRM が使わない
+    MariaDB の help テーブルと統計も引き続き削除します。
   - 毎起動、`/var/lib/espocrm/data/config.php` を書き直します。DB の
     パスワードは `db_password` に、`siteUrl` は公開 origin に、OIDC の
     endpoint・client id/secret・scopes・既定チームは Binding と relay に
@@ -258,8 +266,17 @@ APP_IMAGE=localhost/ato-e2e/espocrm-flat@sha256:...   # build-images.sh の出�
    selfhost share-app-with-org "$INSTANCE" "$ORG"
    ```
 
-Runner は network controls を有効（`ATO_RUNTIME_NETWORK_CONTROLS=true`）にし、
-`network=ato.oidc-issuer@1` を提供している必要があります。
+Coordinator（API）は `a250f81c7` 以降（ato-api の `d614cc2aa` と
+`1abbe9b20` を含む）、Runner は `68de170` 以降（ato#1931）が必要です。network
+Binding を宣言した 1 step の route を 1 サービスの group として起動するのは
+この版からです。Runner は network controls を有効
+（`ATO_RUNTIME_NETWORK_CONTROLS=true`）にし、`network=ato.oidc-issuer@1` を
+提供している必要があります。
+
+以前の service group 版（2 サービスの capsule）を import 済みの Instance は、
+state の持ち方が変わるため 1 step 版へは in-place update できません
+（`state_shape_incompatible` で拒否されます）。新しい Instance を import し、
+`set-app-oidc` と organization の共有をやり直してください。
 
 ## 確認したこと
 
@@ -277,45 +294,40 @@ EspoCRM の実物のソースを読んで確認したこと（9.3.11 の image �
   `**oidc:<code>` の Basic 認証と `X-Oidc-Authorization-Nonce` です。
 - token・userinfo・JWKS の curl は `CURLPROTO_HTTP` を許可しており、relay の
   http をそのまま使えることをソースで確認しました（TLS 終端は不要）。
-- OIDC の relay は service group のサービスにだけ注入されます。1 step の
-  route では `ATO_BINDING_OIDC_ISSUER` が渡らないことを VM で実測したため、
-  このサンプルは `espocrm` と `keepalive` の 2 サービスの group にしています。
 
 2026-11-22 にローカルの Lima VM（arm64、linux/arm64、network controls を
-有効にした Runner）で確認したこと:
+有効にした Runner）で確認したこと。Coordinator（API）は `a250f81c7`、Runner は
+`68de170`（ato#1931）、validator は `9cc4eaf1` の版で行いました。
 
 - 公式 image を上の digest で取得し、`build-images.sh` が digest-pinned な
   image 参照を出力すること。build した image を read-only・非 root
   （1000:1000）・1 state・64 MB の noexec `/tmp` で起動し、MariaDB の初期化、
   `install/cli.php` によるインストール、Apache の起動、Role/Team の作成、
   `/status.php` の 200、OIDC 設定の書き込みまでが通ること（ローカル再現）。
-- VM の Runner で service group が起動し、`espocrm` サービスに
-  `ATO_BINDING_OIDC_ISSUER` を含む Binding が注入されること。Instance は
-  `/status.php` の contract を満たして running になり、`set-app-oidc` で
-  登録した client（`--auto email_local --email`）の redirect origin が Instance
-  の公開 origin と一致すること。
-- state は MariaDB・EspoCRM の `data/` を含めて `du` で約 111 MiB でした
-  （MariaDB の help テーブル削除・`innodb_undo_tablespaces=0` などの圧縮を
-  入れた後）。この state で in-place update の checkpoint は完了しています
-  （下記の未確認事項も参照）。
-
-VM フェーズで確認しきれなかったこと（時間切れで、最終 bundle の再配備中に
-作業を止めました）:
-
-- Ato のブラウザサインインから EspoCRM のユーザー作成・Account の作成/読み
-  取りまでを通しでの確認。手元の HTTP ドライバでは、Instance がまだ
-  `ATO_OIDC_PUBLIC_ISSUER` の既定値（`https://selfhost.ato.run/...`）で
-  render された bundle のままで、Ato（`https://ato.localhost`）の authorize が
-  400 を返すところまでを観測しました。`render.sh` は 4 番目の引数で
-  installation の公開 issuer を渡せるようにし、VM では
-  `https://ato.localhost/v1/selfhost/oidc` を渡す手順にしています。この
-  修正版 bundle の再配備を実行したところで時間切れになりました。
-- 2 人の分離、in-place update 後のレコード保持、organization からの削除後の
-  403 は、上記のサインインが通ってからでないと確認できません（未確認）。
-- VM の Runner は service group の各サービスが Port を受け付けるまでを
-  起動完了とみなすため、`keepalive` は PHP の built-in server で 9999 番を
-  待ち受けています。Runner の readiness timeout は 60 秒で、インストールを
-  含む初回起動がこれに収まることは確認済みです。
+- capsule は 1 step の OCI derivation で、Ato が 1 サービスの group として起動し、
+  `app` コンテナに `ATO_BINDING_OIDC_ISSUER` を含む Binding が注入されること。
+  Instance は `/status.php` の contract を満たして running になり、
+  `set-app-oidc` で登録した client（`--auto email_local --email`）の redirect
+  origin が Instance の公開 origin と一致すること。
+- Ato のブラウザサインイン（pairing → Library の Open → OIDC ポップアップ）から
+  EspoCRM のユーザー作成・Account の作成/読み取りまでを通しで確認しました。
+  2 人のユーザーが EspoCRM のログインなしにそれぞれ自分の EspoCRM ユーザー
+  （ユーザー名は Ato の app account、メールアドレスは Ato のもの）で入り、
+  自分の Account を作って読め、一覧は自分の 1 件だけ、管理者ではありません
+  （Role API は 403）。相手の Account は 403 で読めません。
+- 同じ Instance のままの in-place update（README だけを変えた rebuild）で state が
+  checkpoint され、update 後も両方の Account が残ること（新しい OIDC サインインで
+  読み直して確認）。
+- organization から外すと、開いていたセッションの次の要求が 403 になり、
+  残った人のセッションはそのまま動くこと。
+- 公開 issuer は VM の `https://ato.localhost/v1/selfhost/oidc` を
+  `render.sh` の 4 番目の引数で渡して確認しました。本番既定値
+  `https://selfhost.ato.run/v1/selfhost/oidc` での実行はこの VM では
+  行っていません（同じく引数で渡すだけです）。
+- state は停止時で `du` 約 62 MiB、checkpoint が pack する非圧縮 tar で
+  64,727,040 bytes でした。上限 64 MiB（control plane と Runner の両方で
+  `MAX_STATE_ARTIFACT_BYTES`）の内側で、in-place update の checkpoint は
+  毎回完了しています（`checkpoint_revision_id` が採番されました）。
 
 ## 制限
 
@@ -326,11 +338,12 @@ VM フェーズで確認しきれなかったこと（時間切れで、最終 b
   MariaDB の socket と一時ファイル）。
 - MariaDB はコンテナ内の 127.0.0.1 だけを listen し、別ホストの DB は
   使いません。外部 DB にする場合は image と binding ごと差し替えてください。
-- state checkpoint は 64 MiB までです。EspoCRM の DB と `data/` は
-  インストール直後で約 60 MiB です（MariaDB の help テーブル削除・
-  `innodb_undo_tablespaces=0`・小さい redo/temp file で縮めています）。
-  レコードや uploads が育って収まらなくなったら、in-place update の代わりに
-  DB を export して新しい Instance に移してください。
+- state checkpoint は control plane と Runner の両方で 64 MiB までです
+  （`ato.state.filesystem@1` の非圧縮 tar、`MAX_STATE_ARTIFACT_BYTES`）。
+  EspoCRM の DB と `data/` は、インストール直後の datadir 再構築後で停止時
+  tar 約 62 MiB です（undo を独立 tablespace に出す・help テーブル削除・
+  小さい redo/temp file）。レコードや uploads が育って収まらなくなったら、
+  in-place update の代わりに DB を export して新しい Instance に移してください。
 - EspoCRM の OIDC は id_token の `iss` を設定値と照合しません（存在だけを
   確認します）。issuer の検証は Ato 側の authorize/token が担います。
 - OIDC の JWKS は EspoCRM が 10 分キャッシュします（`oidcJwksCachePeriod`）。

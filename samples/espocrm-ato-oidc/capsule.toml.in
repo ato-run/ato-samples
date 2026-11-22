@@ -9,10 +9,10 @@ id = "workspace"
 use = "ato.workspace@1"
 path = "."
 
-# Ato's OpenID Provider, reached through the Runner's issuer relay. It is
-# declared as a Binding of the service below; the Runner grants the relay to
-# each service of an OCI service group, which is why the one application
-# container is declared as a group of one service.
+# Ato's OpenID Provider, reached through the Runner's issuer relay. Ato launches
+# a single-step OCI route that declares this network Binding as a group of one
+# service, so the application container receives the relay (ato-api a250f81c7
+# or later, ato Runner 68de170 or later).
 [[binding]]
 id = "oidc_issuer"
 protocol = "ato.oidc-issuer@1"
@@ -67,37 +67,20 @@ status = 200
 # support at most one filesystem state, and a state cannot be shared by two
 # services. start.sh starts mariadbd, then Apache, and exits when either stops.
 #
-# The Runner grants a service the oidc_issuer relay of the Bindings it lists,
-# and only a service group has services to grant it to: a single-step OCI
-# route does not receive the relay, so EspoCRM could not reach the
-# token/userinfo/JWKS endpoints. A service group needs 2-4 services, so the
-# ESPoCRM container is accompanied by a tiny idle container from the same
-# image that only holds the group open (EspoCRM itself runs the database
-# in-process, as explained below).
+# A single step, so it is not an oci_service_group: the step's image, argv,
+# environment, state and Surface Port are the route's own, and the Bindings
+# above belong to the application. The Runner grants the oidc_issuer relay per
+# service; the Coordinator launches a single-step route that declares this
+# network Binding as a group of one service, so the container still gets the
+# relay.
 [[derivation]]
 id = "oci-@ARCH@"
 use = "ato.oci@1"
-runtimes = { "oci.platform" = "@PLATFORM@" }
-
-[[derivation.service]]
-id = "espocrm"
-bindings = ["oidc_issuer", "oidc_client_id", "oidc_client_secret", "db_password", "admin_password"]
 argv = ["/app/start.sh"]
-ports = [{ id = "app.http", guest_port = 8080 }]
-state = ["espocrm"]
+cwd = "."
+guest_port = 8080
 env = { APACHE_RUN_DIR = "/tmp/apache2/run", APACHE_LOCK_DIR = "/tmp/apache2/lock", APACHE_LOG_DIR = "/tmp/apache2/log", APACHE_PID_FILE = "/tmp/apache2/run/apache2.pid", ATO_OIDC_PUBLIC_ISSUER = "@PUBLIC_ISSUER@", ESPOCRM_APP_URL = "@APP_URL@" }
-runtimes = { "oci.image" = "@APP_IMAGE@", "oci.entrypoint" = "/bin/sh", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "1073741824", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256" }
-
-# A service group needs at least two serving services and every service must
-# listen on its Port, so this second service is the same image running PHP's
-# built-in web server: it accepts connections and serves nothing. It holds no
-# Binding and no state. EspoCRM and its database are one process tree in the
-# espocrm service above, so nothing talks to this container.
-[[derivation.service]]
-id = "keepalive"
-argv = ["/usr/local/bin/php", "-S", "0.0.0.0:9999", "-t", "/tmp"]
-ports = [{ id = "keepalive.tcp", guest_port = 9999 }]
-runtimes = { "oci.image" = "@APP_IMAGE@", "oci.memory_bytes" = "33554432", "oci.cpu_limit_millis" = "50", "oci.pids_limit" = "16" }
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.platform" = "@PLATFORM@", "oci.entrypoint" = "/bin/sh", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "1073741824", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256" }
 
 [effects]
 default = "pure"
