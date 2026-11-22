@@ -37,6 +37,30 @@ app_url=${ATO_APP_ORIGIN:-${BOOKSTACK_APP_URL:-}}
 [ -n "$app_url" ] || fatal "BOOKSTACK_APP_URL (the Instance's public https origin) is required"
 app_url=${app_url%/}
 
+# BookStack accepts only https:// for the token and userinfo endpoints, and the
+# Runner's issuer relay is plain http on the container's gateway. When it is,
+# socat terminates TLS on localhost and forwards to the relay; PHP trusts that
+# certificate, which is made on every start and stays in /tmp. The relay itself
+# is still the only way out to the issuer.
+relay=${ATO_BINDING_OIDC_ISSUER%/}
+tls_dir=/tmp/bookstack-oidc-tls
+tls_port=8443
+case "$relay" in
+  https://*)
+    backchannel_issuer=$relay
+    ;;
+  http://*)
+    relay_rest=${relay#http://}
+    relay_hostport=${relay_rest%%/*}
+    relay_path=
+    [ "$relay_rest" = "$relay_hostport" ] || relay_path=/${relay_rest#*/}
+    backchannel_issuer=https://localhost:$tls_port$relay_path
+    ;;
+  *)
+    fatal "ATO_BINDING_OIDC_ISSUER must be an http:// or https:// URL"
+    ;;
+esac
+
 # State layout, the Apache runtime directories (/tmp is the only writable
 # place outside the declared state) and the database datadir.
 mkdir -p "$STATE/storage/app/public" \
@@ -78,19 +102,36 @@ EOF
 
 db_pid=
 web_pid=
+tls_pid=
 stop() {
   trap - INT TERM
   echo "bookstack: stopping" >&2
-  if [ -n "$db_pid" ]; then
-    kill "$db_pid" 2>/dev/null || true
-  fi
-  if [ -n "$web_pid" ]; then
-    kill "$web_pid" 2>/dev/null || true
-  fi
+  for pid in $db_pid $web_pid $tls_pid; do
+    kill "$pid" 2>/dev/null || true
+  done
   wait 2>/dev/null || true
   exit 143
 }
 trap stop INT TERM
+
+if [ -n "${relay_hostport:-}" ]; then
+  mkdir -p "$tls_dir" /tmp/bookstack-php.d
+  ( umask 077
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=localhost \
+      -addext subjectAltName=DNS:localhost \
+      -keyout "$tls_dir/key.pem" -out "$tls_dir/cert.pem" 2>/dev/null ) \
+    || fatal "cannot create the local TLS certificate for the OIDC relay"
+  # Keep the public CAs next to the local certificate, so other https calls
+  # BookStack makes are verified as before.
+  cat /etc/ssl/certs/ca-certificates.crt "$tls_dir/cert.pem" > "$tls_dir/ca.pem" 2>/dev/null \
+    || cp "$tls_dir/cert.pem" "$tls_dir/ca.pem"
+  printf 'curl.cainfo=%s\nopenssl.cafile=%s\n' "$tls_dir/ca.pem" "$tls_dir/ca.pem" \
+    > /tmp/bookstack-php.d/ato-oidc-relay.ini
+  export PHP_INI_SCAN_DIR="${PHP_INI_DIR:-/usr/local/etc/php}/conf.d:/tmp/bookstack-php.d"
+  socat "OPENSSL-LISTEN:$tls_port,bind=127.0.0.1,reuseaddr,fork,cert=$tls_dir/cert.pem,key=$tls_dir/key.pem,verify=0" \
+    "TCP:$relay_hostport" &
+  tls_pid=$!
+fi
 
 # The datadir belongs to the container user and is created on first start, so
 # no step needs root.
@@ -135,7 +176,7 @@ oidc_userinfo=
 if [ "${BOOKSTACK_OIDC_USERINFO_ENDPOINT:-1}" != "0" ]; then
   # BookStack v26 support for OIDC_USERINFO_ENDPOINT is not verified; set
   # BOOKSTACK_OIDC_USERINFO_ENDPOINT=0 to leave the line out.
-  oidc_userinfo="OIDC_USERINFO_ENDPOINT=$ATO_BINDING_OIDC_ISSUER/userinfo"
+  oidc_userinfo="OIDC_USERINFO_ENDPOINT=$backchannel_issuer/userinfo"
 fi
 cat > "$STATE/.env" <<EOF
 APP_ENV=production
@@ -160,7 +201,7 @@ OIDC_CLIENT_SECRET=$ATO_BINDING_OIDC_CLIENT_SECRET
 OIDC_ISSUER=$ATO_OIDC_PUBLIC_ISSUER
 OIDC_ISSUER_DISCOVER=false
 OIDC_AUTH_ENDPOINT=$ATO_OIDC_PUBLIC_ISSUER/authorize
-OIDC_TOKEN_ENDPOINT=$ATO_BINDING_OIDC_ISSUER/token
+OIDC_TOKEN_ENDPOINT=$backchannel_issuer/token
 $oidc_userinfo
 OIDC_PUBLIC_KEY=file://$STATE/oidc-key.pem
 EOF
@@ -191,20 +232,12 @@ foreach ($document['keys'] ?? [] as $jwk) {
     if (isset($jwk['alg']) && $jwk['alg'] !== 'RS256') {
         continue;
     }
-    $key = null;
+    // phpseclib 3 reads a JWK as a JSON string, not as a decoded array.
     try {
-        $key = \phpseclib3\Crypt\PublicKeyLoader::load($jwk);
+        $key = \phpseclib3\Crypt\PublicKeyLoader::load(json_encode($jwk));
     } catch (\Throwable $error) {
-        try {
-            $key = \phpseclib3\Crypt\PublicKeyLoader::loadFormat('JWK', $jwk);
-        } catch (\Throwable $error) {
-            try {
-                $key = \phpseclib3\Crypt\RSA::loadFormat('JWK', $jwk);
-            } catch (\Throwable $error) {
-                fwrite(STDERR, 'bookstack: cannot read the JWK: ' . $error->getMessage() . "\n");
-                continue;
-            }
-        }
+        fwrite(STDERR, 'bookstack: cannot read the JWK: ' . $error->getMessage() . "\n");
+        continue;
     }
     $pem = $key->toString('PKCS8');
     if (file_put_contents($keyFile . '.new', $pem) === false || !rename($keyFile . '.new', $keyFile)) {
@@ -242,9 +275,23 @@ while ! ( cd "$APP_DIR" && php artisan migrate --force ); do
   sleep 3
 done
 
-# Apache runs in the background so the container can watch both processes: if
-# either stops, stop the other and exit non-zero, and the Runner restarts the
-# Run instead of serving without a database (or with a database and no app).
+# BookStack gives an account made at OIDC sign-in only the role in its
+# "registration-role" setting, and a fresh install has none, so the first
+# people would arrive with no permissions. Set it to BOOKSTACK_DEFAULT_ROLE
+# (a role's display name, Editor unless told otherwise) once; a role an admin
+# chooses later in BookStack is kept.
+default_role=$(printf '%s' "${BOOKSTACK_DEFAULT_ROLE:-Editor}" | sed -e 's/\\/\\\\/g' -e "s/'/''/g")
+mariadb --no-defaults --socket="$SOCKET" -uroot bookstack <<SQL || fatal "cannot set the default role"
+INSERT INTO settings (setting_key, value, type, created_at, updated_at)
+SELECT 'registration-role', id, 'string', NOW(), NOW() FROM roles
+WHERE display_name = '${default_role}'
+  AND NOT EXISTS (SELECT 1 FROM settings WHERE setting_key = 'registration-role')
+ORDER BY id LIMIT 1;
+SQL
+
+# Apache runs in the background so the container can watch every process: if
+# one stops, stop the others and exit non-zero, and the Runner restarts the Run
+# instead of serving without a database, an app or a way to finish sign-in.
 apache2-foreground &
 web_pid=$!
 
@@ -255,12 +302,16 @@ wait -n
 status=$?
 set -e
 
-if kill -0 "$db_pid" 2>/dev/null; then
-  echo "bookstack: Apache stopped; stopping MariaDB" >&2
+if ! kill -0 "$db_pid" 2>/dev/null; then
+  echo "bookstack: MariaDB stopped" >&2
+elif ! kill -0 "$web_pid" 2>/dev/null; then
+  echo "bookstack: Apache stopped" >&2
 else
-  echo "bookstack: MariaDB stopped; stopping Apache" >&2
+  echo "bookstack: the OIDC relay forwarder stopped" >&2
 fi
-kill "$db_pid" "$web_pid" 2>/dev/null || true
-wait "$db_pid" "$web_pid" 2>/dev/null || true
+for pid in $db_pid $web_pid $tls_pid; do
+  kill "$pid" 2>/dev/null || true
+done
+wait 2>/dev/null || true
 [ "$status" -ne 0 ] || status=1
 exit "$status"

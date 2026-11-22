@@ -10,14 +10,24 @@ BookStack 自身のログインフォームは使いません。利用者ごと�
 
 - Ato のセルフホスト Coordinator が OpenID Provider です
   （`<origin>/v1/selfhost/oidc`）。
-- `oidc_issuer` Binding（`ato.oidc-issuer@1`）は、BookStack サービスに
-  Runner が持つ relay を渡します。token と userinfo はサーバー側で
-  `ATO_BINDING_OIDC_ISSUER` 経由、ブラウザは公開 authorize endpoint を
-  使います。公開 issuer は capsule の env `ATO_OIDC_PUBLIC_ISSUER`
-  （既定は `https://selfhost.ato.run/v1/selfhost/oidc`）で、別の
-  インストールではこの 1 行を変えます。
+- `oidc_issuer` Binding（`ato.oidc-issuer@1`）は、BookStack に Runner が
+  持つ relay（`ATO_BINDING_OIDC_ISSUER`、コンテナの gateway 上の http）を
+  渡します。token と userinfo はサーバー側で relay 経由、ブラウザは公開
+  authorize endpoint を使います。公開 issuer は capsule の env
+  `ATO_OIDC_PUBLIC_ISSUER`（既定は `https://selfhost.ato.run/v1/selfhost/oidc`）
+  で、別のインストールではこの 1 行を変えます。
+- BookStack は token と userinfo の endpoint に `https://` しか受け付けません。
+  relay が http のときは、`start.sh` が socat でコンテナ内の
+  `https://localhost:8443` に TLS を終端して relay へ転送し、その証明書を
+  PHP の `curl.cainfo` に加えます（公開 CA もそのまま信頼します）。証明書と
+  鍵は起動のたびに `/tmp` に作り、state には残しません。外へ出る経路は
+  relay だけのままです。
 - `oidc_client_id`・`oidc_client_secret`・`db_password` は import 時に
   渡す secret Binding です。
+- capsule は 1 step の OCI derivation です（`oci_service_group` ではあり
+  ません）。Runner は relay をサービスごとに与えるので、Ato は network
+  Binding を宣言した 1 step の route を 1 サービスの group として起動します
+  （ato-api `1abbe9b` 以降と、ato の Runner `68de170` 以降が必要です）。
 - BookStack とその MariaDB は **1 つのコンテナ** で動きます。portable な
   capsule は filesystem state を 1 つしか持てず、1 つの state を 2 つの
   サービスで共有することもできません。DB を別サービスにすると state を
@@ -25,7 +35,8 @@ BookStack 自身のログインフォームは使いません。利用者ごと�
   state `/var/lib/bookstack` の中に DB の datadir を置いています。
 - `start.sh` の流れ:
   - 初回起動時に `mariadb-install-db` で `db/` を初期化します。datadir は
-    コンテナユーザー（33:33）が作り、所有するので root は不要です。
+    Runner が指定する非 root のコンテナユーザー（本番の Runner では
+    1000:1000）が作り、所有するので root は不要です。
   - 毎起動、`mariadbd` をバックグラウンドで起動して socket
     `/tmp/mysqld.sock` を待ち、`bookstack` データベースと
     `bookstack`@`localhost` ユーザーを冪等に作り、`db_password`
@@ -36,10 +47,15 @@ BookStack 自身のログインフォームは使いません。利用者ごと�
     接続します。`APP_KEY` と OIDC の公開鍵だけを state に残し、JWKS は
     relay から取得して BookStack 同梱の phpseclib 3 で PEM に変換して
     `OIDC_PUBLIC_KEY` として渡します。
-  - `php artisan migrate --force` のあと Apache をバックグラウンドで起動し、
-    MariaDB と Apache のどちらかが止まったらもう一方も止めて非 0 で
-    終了します。Runner は Run を再起動するので、DB なしでリクエストを
-    処理し続けることはありません。
+  - `php artisan migrate --force` のあと、BookStack の `registration-role`
+    がまだなければ `BOOKSTACK_DEFAULT_ROLE`（role の表示名、既定は
+    `Editor`）にします。BookStack は OIDC で初めて入った人にこの role だけを
+    付け、新規インストールでは未設定のため、設定しないと権限のない
+    アカウントになります。管理者が後で BookStack で変えた値は上書きしません。
+  - Apache をバックグラウンドで起動し、MariaDB・Apache・relay への転送の
+    どれかが止まったら残りも止めて非 0 で終了します。Runner は Run を
+    再起動するので、DB やサインインの経路なしでリクエストを処理し続ける
+    ことはありません。
 - コードは image の読み取り専用領域にあります。Instance の state は
   `/var/lib/bookstack` の 1 つだけです（`.env`、`storage/`、
   `bootstrap/cache/`、`public/uploads/`、OIDC の鍵、MariaDB の `db/`）。
@@ -53,7 +69,8 @@ image id を 1 つ出力します。平坦化では元 image の ENV を 1 つ�
 ダブルクォートで囲んで `--change` に渡し（`PHPIZE_DEPS` のように空白を
 含む値で `docker import` が `Syntax error - can't find = in ...` に
 ならないように）、WORKDIR を保ったまま USER を 33:33 にし、ENTRYPOINT を
-外します（`VOLUME` は import 後の image には残りません）。
+外します（`VOLUME` は import 後の image には残りません）。Runner は実行時に
+自分のユーザーを指定するので、USER は Runner の外で動かすときの既定です。
 
 ```sh
 cd samples/bookstack-ato-oidc
@@ -97,68 +114,78 @@ APP_IMAGE=sha256:...   # build-images.sh の出力
 
 ## セルフホスト Ato にインストールする
 
-1. client id と 32 文字以上の client secret、DB パスワードを決めます。
+コマンドはセルフホストのホスト CLI（API コンテナの
+`node dist/selfhost/server.mjs`、以下 `selfhost`）です。`.capsule` は
+`ato pack` で作ります。
+
+1. client id と 32 文字以上の client secret、DB パスワードを決め、
+   `{"oidc_client_id": ..., "oidc_client_secret": ..., "db_password": ...}`
+   の JSON を root だけが読めるファイルに置きます（以下 `bookstack.json`）。
 2. まず Instance を作ります。この時点の `APP_URL` は仮の origin で構いません。
 
    ```sh
-   ato upload-bundle bookstack-ato-oidc          # → BUNDLE
-   ato import-bundle "$OWNER" "$BUNDLE" --runner "$RUNNER" --bindings-stdin
+   selfhost upload-bundle "$OWNER" < bookstack.capsule        # → BUNDLE
+   selfhost import-bundle "$OWNER" "$BUNDLE" --runner "$RUNNER" \
+     --bindings-stdin < bookstack.json                         # → INSTANCE
    ```
 
-   `--bindings-stdin` では `oidc_client_id`・`oidc_client_secret`・
-   `db_password` の 3 つの secret を渡します。
-
-3. Instance の route（`https://cinst-...`）を確認し、その origin で
-   `capsule.toml` を render し直して同じ Instance に反映します。
+3. Instance の host（`https://cinst-...`）を確認し、その origin で
+   `capsule.toml` を render し直し、pack して同じ Instance に反映します。
+   `show-app-update` が `completed` になるまで待ちます。
 
    ```sh
    ./render.sh "$APP_IMAGE" linux/amd64 "https://cinst-....example" \
      > capsule.toml
-   ato upload-bundle bookstack-ato-oidc
-   ato update-app "$INSTANCE" --bundle "$BUNDLE"
+   selfhost upload-bundle "$OWNER" < bookstack.capsule        # → BUNDLE
+   selfhost update-app "$INSTANCE" "$BUNDLE" --bindings-stdin < bookstack.json
+   selfhost show-app-update "$INSTANCE"
    ```
 
 4. アプリの OIDC を有効にします。client secret は stdin から渡します。
+   BookStack はメールアドレスのない人をサインインさせないので、`--email` で
+   id_token に `email` を含めます。
 
    ```sh
-   ato set-app-oidc "$INSTANCE" --client-id "$CLIENT_ID" --auto email_local \
-     < client-secret.txt
+   selfhost set-app-oidc "$INSTANCE" --client-id "$CLIENT_ID" \
+     --auto email_local --email < client-secret.txt
    ```
 
 5. メンバーを追加するか（`add-app-member`）、organization に共有します。
 
    ```sh
-   ato share-app-with-org "$INSTANCE" --org "$ORG"
+   selfhost share-app-with-org "$INSTANCE" "$ORG"
    ```
 
 Runner は network controls を有効（`ATO_RUNTIME_NETWORK_CONTROLS=true`）にし、
 `network=ato.oidc-issuer@1` を提供している必要があります。
 
-## 制限と未検証項目
+## 確認したことと制限
 
-- このサンプルはこのリポジトリの検証環境で image の build も実行もして
-  いません。確認したのは `bash -n` / `sh -n` と、`render.sh` が生成した
-  TOML を python3 の `tomllib` で解析する check だけです。次の点は実際の
-  デプロイで確認してください。
-  - Debian の `mariadb-server` が、read-only image・非 root（33:33）・
-    1 state の構成で `mariadb-install-db` と `mariadbd` を実行できること。
-  - BookStack v26.09.3 が `DB_SOCKET`・`OIDC_USERINFO_ENDPOINT`・
-    `OIDC_PUBLIC_KEY` を解釈すること。`OIDC_USERINFO_ENDPOINT` は
-    `BOOKSTACK_OIDC_USERINFO_ENDPOINT=0` で `.env` から外せます。
-  - BookStack 同梱の phpseclib 3 で JWKS から PEM に変換できること
-    （`start.sh` は 3 通りの API を順に試します）。
-  - `/status` が未認証で 200 を返し、contract の観測に使えること。
-  - BookStack の archive から `composer install` だけで動くこと。
-  - `ato upload-bundle` / `import-bundle` / `update-app` の引数は
-    CLI のバージョンに合わせて読み替えてください（このサンプルでは
-    デプロイを実行していません）。
+- 2026-11-22 に本番のセルフホスト（linux/amd64、network controls を有効に
+  した Runner）で次を確認しました。
+  - read-only の image・非 root（1000:1000）・1 state で MariaDB の初期化と
+    起動、migration、`/status` の contract 観測（verification receipt が
+    `fully_satisfied`）が通ること。
+  - 2 人（ブラウザの利用者と、セッションのトークンを使う HTTP クライアント）
+    が Library から開くと、BookStack のログインなしにそれぞれ自分の
+    BookStack アカウント（`email_local` の名前と Ato のメールアドレス）で
+    入れること。新しいアカウントは Editor で、本を作って読めること。
+  - 同じ Instance のままの更新（checkpoint を含む）の後も本が残ること。
+  - organization から外すと、開いていたセッションの次の要求が 403 になり、
+    Library からも開けなくなること。戻すと元のデータが見えること。
+- `OIDC_USERINFO_ENDPOINT` は `BOOKSTACK_OIDC_USERINFO_ENDPOINT=0` で
+  `.env` から外せます。
 - state checkpoint は 64 MiB までです。MariaDB は
   `innodb_log_file_size=8M`・`innodb_buffer_pool_size=64M`・
   `performance_schema=OFF`・binlog なし・test DB なし・
-  `ibdata1:12M:autoextend` で初期化していますが、MariaDB の datadir と
-  BookStack の uploads（`public/uploads/`）はこの上限に収まる必要が
-  あります。wiki が育つと in-place update には収まらなくなるので、
-  その場合は DB を export して新しい Instance に移してください。
+  `ibdata1:12M:autoextend` で初期化しています。初期化直後の state は
+  `du` で約 73 MB で、この大きさでも checkpoint は通りました。MariaDB の
+  datadir と BookStack の uploads（`public/uploads/`）が育って checkpoint に
+  収まらなくなったら、in-place update の代わりに DB を export して新しい
+  Instance に移してください。
+- BookStack の管理者はいません（パスワードのログインは無効です）。
+  role を変えるには、DB で `role_user` を直接変えるか、OIDC の group 同期を
+  別に設定してください。
 - `start.sh` は bash の `wait -n` を使うため、capsule が `/bin/sh` で
   起動した場合は自分自身を `/bin/bash` で再実行します。image の base
   （Debian）には bash が入っています。

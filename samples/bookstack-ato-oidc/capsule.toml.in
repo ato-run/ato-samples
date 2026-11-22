@@ -50,22 +50,22 @@ port = "app.http"
 path = "/status"
 status = 200
 
-[[derivation]]
-id = "oci-@ARCH@"
-use = "ato.oci@1"
-runtimes = { "oci.platform" = "@PLATFORM@" }
-
 # BookStack and its database in one container and one state: portable capsules
 # support at most one filesystem state, and a state cannot be shared by two
 # services. start.sh starts mariadbd, then Apache, and exits when either stops.
-[[derivation.service]]
-id = "bookstack"
-runtimes = { "oci.image" = "@APP_IMAGE@", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "805306368", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256", "oci.entrypoint" = "/bin/sh" }
+#
+# A single step, so it is not an oci_service_group: the step's image, argv,
+# environment, state and Surface Port are the route's own. The Runner grants
+# the oidc_issuer relay per service, and the control plane launches a
+# single-step route that declares it as a group of one service.
+[[derivation]]
+id = "oci-@ARCH@"
+use = "ato.oci@1"
 argv = ["/app/start.sh"]
+cwd = "."
+guest_port = 8080
 env = { APACHE_RUN_DIR = "/tmp/apache2/run", APACHE_LOCK_DIR = "/tmp/apache2/lock", APACHE_LOG_DIR = "/tmp/apache2/log", APACHE_PID_FILE = "/tmp/apache2/run/apache2.pid", ATO_OIDC_PUBLIC_ISSUER = "https://selfhost.ato.run/v1/selfhost/oidc", BOOKSTACK_APP_URL = "@APP_URL@" }
-ports = [{ id = "app.http", guest_port = 8080 }]
-state = ["bookstack"]
-bindings = ["oidc_issuer", "oidc_client_id", "oidc_client_secret", "db_password"]
+runtimes = { "oci.image" = "@APP_IMAGE@", "oci.platform" = "@PLATFORM@", "oci.entrypoint" = "/bin/sh", "oci.workspace_mount" = "/app", "oci.memory_bytes" = "805306368", "oci.cpu_limit_millis" = "1000", "oci.pids_limit" = "256" }
 
 [effects]
 default = "pure"
