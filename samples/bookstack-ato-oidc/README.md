@@ -156,6 +156,14 @@ APP_IMAGE=sha256:...   # build-images.sh の出力
    selfhost share-app-with-org "$INSTANCE" "$ORG"
    ```
 
+6. Library のアイコンを設定します。capsule はまだアイコンを持てないので、
+   BookStack の image にある BookStack 自身のアイコン
+   （`/var/www/bookstack/public/icon.png`、256×256）を使います。
+
+   ```sh
+   selfhost set-app-icon "$COMPUTE_ID" --icon - < icon.png
+   ```
+
 Runner は network controls を有効（`ATO_RUNTIME_NETWORK_CONTROLS=true`）にし、
 `network=ato.oidc-issuer@1` を提供している必要があります。
 
