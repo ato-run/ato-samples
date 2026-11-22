@@ -90,3 +90,13 @@ evaluated in a Node `vm` sandbox against stub `fetch` and callbacks (no browser,
 no dependency install). They cover the startup decision (unbound → chooser
 prompt, bound → the events are read), the connect call's exact body, the stale
 epoch retry, and disconnect.
+
+## Library icon
+
+`icon.png` (512×512) is this app's icon in the Library, rendered from
+`icon.svg`. A capsule does not carry its icon yet, so set it once after
+installing. On a self-hosted Ato:
+
+```sh
+selfhost set-app-icon COMPUTE_ID --icon - < icon.png
+```
